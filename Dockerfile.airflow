@@ -1,0 +1,8 @@
+FROM apache/airflow:2.5.0
+
+USER root
+RUN mkdir -p /opt/airflow/logs /opt/airflow/dags /opt/airflow/plugins /opt/airflow/config && \
+    chown -R airflow:root /opt/airflow
+
+USER airflow
+RUN pip install --no-cache-dir apache-airflow-providers-apache-spark
