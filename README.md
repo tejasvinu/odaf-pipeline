@@ -65,6 +65,37 @@ docker-compose up -d
    - Grafana: http://localhost:3000 (username: admin, password: admin)
    - Prometheus: http://localhost:9090
 
+## Service Ports
+
+The following ports are configured in the docker-compose setup:
+
+- **Spark Master**
+  - UI: 8084
+  - Spark Master: 7077
+- **Spark Worker**
+  - (No external ports exposed)
+- **Zookeeper**
+  - 2182
+- **Kafka**
+  - Broker: 9092
+- **Kafka UI**
+  - 8085
+- **Cassandra**
+  - 9042
+- **MinIO**
+  - API: 9000
+  - Console: 9001
+- **Prometheus**
+  - 9091
+- **Grafana**
+  - 3001
+- **JupyterLab**
+  - 8890 (maps to container port 8888)
+- **Airflow**
+  - 8081 (maps to container port 8080)
+- **PostgreSQL**
+  - 5432
+
 ## Working with the Stack
 
 ### Running Spark Jobs via Airflow
