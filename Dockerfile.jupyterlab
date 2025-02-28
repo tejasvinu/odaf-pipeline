@@ -1,0 +1,95 @@
+FROM jupyter/pyspark-notebook:latest
+
+USER root
+
+# Install additional system packages
+RUN apt-get update && apt-get install -y \
+    vim \
+    curl \
+    wget \
+    netcat \
+    iputils-ping \
+    dnsutils \
+    htop \
+    graphviz \
+    software-properties-common \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Set environment variables for Spark
+ENV PYTHONPATH=$SPARK_HOME/python:$SPARK_HOME/python/lib/py4j-*-src.zip \
+    PYSPARK_DRIVER_PYTHON=jupyter \
+    PYSPARK_DRIVER_PYTHON_OPTS="lab" \
+    PYSPARK_PYTHON=python3
+
+# Download necessary JARs for Spark integration
+RUN mkdir -p /opt/spark/jars && \
+    cd /opt/spark/jars && \
+    wget https://repo1.maven.org/maven2/com/datastax/spark/spark-cassandra-connector_2.12/3.3.0/spark-cassandra-connector_2.12-3.3.0.jar && \
+    wget https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.3.0/spark-sql-kafka-0-10_2.12-3.3.0.jar && \
+    wget https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.3.1/kafka-clients-3.3.1.jar
+
+# Install additional Python packages for data analysis and processing
+RUN pip install --no-cache-dir \
+    kafka-python==2.0.2 \
+    cassandra-driver==3.25.0 \
+    boto3==1.28.38 \
+    pandas==1.5.3 \
+    numpy==1.24.2 \
+    matplotlib==3.7.1 \
+    seaborn==0.12.2 \
+    scikit-learn==1.2.2 \
+    pyspark==3.3.2 \
+    pymongo==4.3.3 \
+    elasticsearch==8.7.0 \
+    findspark==2.0.1 \
+    mlflow==2.4.1 \
+    prometheus-client==0.16.0 \
+    jupyter-server-proxy==3.2.2 \
+    jupyterlab-drawio==0.9.0 \
+    jupyterlab-git==0.41.0 \
+    nbconvert==7.3.1 \
+    ipywidgets==8.0.6 \
+    plotly==5.14.1 \
+    streamlit==1.22.0 \
+    dash==2.9.3 \
+    pyarrow==11.0.0 \
+    fastapi==0.95.2 \
+    uvicorn==0.22.0
+
+# Create directories for notebooks and data
+RUN mkdir -p /root/notebooks /root/data /root/logs /root/models
+
+# Replace COPY for notebooks with a two-step copy from a temporary location
+COPY notebooks /tmp/notebooks
+RUN if [ -d /tmp/notebooks ]; then \
+      cp -r /tmp/notebooks/*.ipynb /root/notebooks/; \
+    fi && rm -rf /tmp/notebooks
+
+# Setup Jupyter Lab configuration
+RUN mkdir -p /root/.jupyter && \
+    echo "c.ServerApp.token = ''" > /root/.jupyter/jupyter_server_config.py && \
+    echo "c.ServerApp.password = ''" >> /root/.jupyter/jupyter_server_config.py && \
+    echo "c.ServerApp.open_browser = False" >> /root/.jupyter/jupyter_server_config.py && \
+    echo "c.ServerApp.ip = '0.0.0.0'" >> /root/.jupyter/jupyter_server_config.py && \
+    echo "c.ServerApp.allow_origin = '*'" >> /root/.jupyter/jupyter_server_config.py
+
+# Create updated startup script for initialization (directly launching jupyter lab)
+RUN echo '#!/bin/bash\n\
+echo "Initializing environment..."\n\
+if [ ! -d "/root/notebooks/examples" ]; then\n\
+  mkdir -p /root/notebooks/examples\n\
+  cp -r /root/notebooks/*.ipynb /root/notebooks/examples/ 2>/dev/null || echo "No examples to copy."\n\
+fi\n\
+jupyter lab --LabApp.token="" --no-browser\n'\
+> /usr/local/bin/start-jupyter.sh && \
+chmod +x /usr/local/bin/start-jupyter.sh
+
+# Set the working directory
+WORKDIR /root/notebooks
+
+# Expose ports for Jupyter
+EXPOSE 8888
+
+# Start JupyterLab
+CMD ["/usr/local/bin/start-jupyter.sh"]
+
