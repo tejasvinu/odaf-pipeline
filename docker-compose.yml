@@ -196,11 +196,13 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - CASSANDRA_CONTACT_POINTS=cassandra
     volumes:
-      - ./notebooks:/root/notebooks
-      - ./volumes/data:/root/data
-      - ./volumes/jupyter_data:/root/.jupyter
+      - ./notebooks:/root/notebooks:rw
+      - ./volumes/data:/root/data:rw
+      - ./volumes/jupyter_data:/root/.jupyter:rw
     command: >
       bash -c "
+        chown -R root:root /root/notebooks &&
+        chmod -R 755 /root/notebooks &&
         start.sh jupyter lab --no-browser --allow-root --ip=0.0.0.0 --NotebookApp.token='' --NotebookApp.password=''"
     restart: unless-stopped
     networks:
