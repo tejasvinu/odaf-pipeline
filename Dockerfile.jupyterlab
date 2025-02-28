@@ -45,25 +45,20 @@ RUN pip install --no-cache-dir \
     mlflow==2.4.1 \
     prometheus-client==0.16.0 \
     jupyter-server-proxy==3.2.2 \
-    jupyterlab-drawio==0.9.0 \
     jupyterlab-git==0.41.0 \
     nbconvert==7.3.1 \
     ipywidgets==8.0.6 \
     plotly==5.14.1 \
-    streamlit==1.22.0 \
-    dash==2.9.3 \
     pyarrow==11.0.0 \
     fastapi==0.95.2 \
     uvicorn==0.22.0
 
-# Create directories for notebooks and data
-RUN mkdir -p /root/notebooks /root/data /root/logs /root/models
+# Remove problematic package
+RUN pip uninstall -y jupyterlab-drawio || true
 
-# Replace COPY for notebooks with a two-step copy from a temporary location
-COPY notebooks /tmp/notebooks
-RUN if [ -d /tmp/notebooks ]; then \
-      cp -r /tmp/notebooks/*.ipynb /root/notebooks/; \
-    fi && rm -rf /tmp/notebooks
+# Create directories for notebooks and data with proper permissions
+RUN mkdir -p /root/notebooks /root/data /root/logs /root/models && \
+    chmod -R 755 /root/notebooks /root/data /root/logs /root/models
 
 # Setup Jupyter Lab configuration
 RUN mkdir -p /root/.jupyter && \
@@ -71,24 +66,32 @@ RUN mkdir -p /root/.jupyter && \
     echo "c.ServerApp.password = ''" >> /root/.jupyter/jupyter_server_config.py && \
     echo "c.ServerApp.open_browser = False" >> /root/.jupyter/jupyter_server_config.py && \
     echo "c.ServerApp.ip = '0.0.0.0'" >> /root/.jupyter/jupyter_server_config.py && \
-    echo "c.ServerApp.allow_origin = '*'" >> /root/.jupyter/jupyter_server_config.py
+    echo "c.ServerApp.allow_origin = '*'" >> /root/.jupyter/jupyter_server_config.py && \
+    echo "c.ServerApp.allow_root = True" >> /root/.jupyter/jupyter_server_config.py
 
-# Create updated startup script for initialization (directly launching jupyter lab)
-RUN echo '#!/bin/bash\n\
-echo "Initializing environment..."\n\
-if [ ! -d "/root/notebooks/examples" ]; then\n\
-  mkdir -p /root/notebooks/examples\n\
-  cp -r /root/notebooks/*.ipynb /root/notebooks/examples/ 2>/dev/null || echo "No examples to copy."\n\
-fi\n\
-jupyter lab --LabApp.token="" --no-browser\n'\
-> /usr/local/bin/start-jupyter.sh && \
-chmod +x /usr/local/bin/start-jupyter.sh
+# Create an example notebook if none exist
+RUN echo '{\n "cells": [\n  {\n   "cell_type": "markdown",\n   "metadata": {},\n   "source": [\n    "# Welcome to JupyterLab\\n",\n    "\\n",\n    "This is an example notebook."\n   ]\n  },\n  {\n   "cell_type": "code",\n   "execution_count": null,\n   "metadata": {},\n   "source": [\n    "import pyspark\\n",\n    "print(f\\"Spark version: {pyspark.__version__}\\")"\n   ]\n  }\n ],\n "metadata": {\n  "kernelspec": {\n   "display_name": "Python 3",\n   "language": "python",\n   "name": "python3"\n  },\n  "language_info": {\n   "codemirror_mode": {\n    "name": "ipython",\n    "version": 3\n   },\n   "file_extension": ".py",\n   "mimetype": "text/x-python",\n   "name": "python",\n   "nbconvert_exporter": "python",\n   "pygments_lexer": "ipython3",\n   "version": "3.10.0"\n  }\n },\n "nbformat": 4,\n "nbformat_minor": 4\n}' > /root/notebooks/example.ipynb
+
+# Fix permissions for the example notebook
+RUN chmod 644 /root/notebooks/example.ipynb
 
 # Set the working directory
 WORKDIR /root/notebooks
 
 # Expose ports for Jupyter
 EXPOSE 8888
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+echo "Initializing JupyterLab environment..."\n\
+mkdir -p /root/notebooks /root/data /root/.jupyter\n\
+chmod -R 755 /root/notebooks /root/data /root/.jupyter\n\
+if [ -z "$(ls -A /root/notebooks)" ]; then\n\
+  echo "Creating example notebook..."\n\
+  cp /root/notebooks/example.ipynb /root/notebooks/welcome.ipynb 2>/dev/null || echo "No example to copy."\n\
+fi\n\
+exec jupyter lab --ServerApp.root_dir=/root/notebooks --ip=0.0.0.0 --no-browser --allow-root\n' > /usr/local/bin/start-jupyter.sh && \
+chmod +x /usr/local/bin/start-jupyter.sh
 
 # Start JupyterLab
 CMD ["/usr/local/bin/start-jupyter.sh"]
