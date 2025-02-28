@@ -18,3 +18,19 @@ scrape_configs:
   - job_name: 'cassandra'
     static_configs:
       - targets: ['cassandra:9042']
+
+  - job_name: 'ipmi-exporter'
+    static_configs:
+      - targets: ['10.180.8.24:9290']
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['10.180.8.24:9100']
+
+  - job_name: 'dcgm-exporter'
+    static_configs:
+      - targets: ['10.180.8.24:9400']
+
+  - job_name: 'slurm-exporter'
+    static_configs:
+      - targets: ['10.180.8.24:8080']
