@@ -150,6 +150,7 @@ services:
   # Prometheus for monitoring
   prometheus:
     image: prom/prometheus
+    user: root  # Add this line to run as root
     ports:
       - "9091:9090"
     volumes:
@@ -167,6 +168,7 @@ services:
   # Grafana for data visualization
   grafana:
     image: grafana/grafana
+    user: root  # Add this line to run as root
     ports:
       - "3001:3000"
     environment:
@@ -215,6 +217,7 @@ services:
   # Airflow for workflow orchestration
   airflow:
     image: apache/airflow:2.5.0
+    user: root  # Add this line to run as root
     depends_on:
       - postgres
     environment:
