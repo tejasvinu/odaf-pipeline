@@ -4,6 +4,7 @@ from airflow.operators.bash import BashOperator
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.operators.python import PythonOperator
 from airflow.models import Variable
+import os
 
 default_args = {
     'owner': 'airflow',
@@ -24,39 +25,42 @@ dag = DAG(
     tags=['metrics', 'spark', 'kafka', 'cassandra', 'minio'],
 )
 
-# Check service dependencies with proper error messages
+# Health checks for services using netcat (available in both busybox and full netcat)
 check_kafka = BashOperator(
     task_id='check_kafka',
-    bash_command='nc -z kafka 29092 || (echo "Kafka is not available" && exit 1)',
+    bash_command='''kafka_host="kafka" && kafka_port="9092" && (nc -z $kafka_host $kafka_port || nc -w 1 $kafka_host $kafka_port) || (echo "Kafka is not available" && exit 1)''',
     dag=dag,
 )
 
 check_cassandra = BashOperator(
     task_id='check_cassandra',
-    bash_command='nc -z cassandra 9042 || (echo "Cassandra is not available" && exit 1)',
+    bash_command='''cassandra_host="cassandra" && cassandra_port="9042" && (nc -z $cassandra_host $cassandra_port || nc -w 1 $cassandra_host $cassandra_port) || (echo "Cassandra is not available" && exit 1)''',
     dag=dag,
 )
 
 check_prometheus = BashOperator(
     task_id='check_prometheus',
-    bash_command='nc -z prometheus 9090 || (echo "Prometheus is not available" && exit 1)',
+    bash_command='''prometheus_host="prometheus" && prometheus_port="9090" && (nc -z $prometheus_host $prometheus_port || nc -w 1 $prometheus_host $prometheus_port) || (echo "Prometheus is not available" && exit 1)''',
     dag=dag,
 )
 
 check_minio = BashOperator(
     task_id='check_minio',
-    bash_command='nc -z minio 9000 || (echo "MinIO is not available" && exit 1)',
+    bash_command='''minio_host="minio" && minio_port="9000" && (nc -z $minio_host $minio_port || nc -w 1 $minio_host $minio_port) || (echo "MinIO is not available" && exit 1)''',
     dag=dag,
 )
 
-# Create Kafka topics
+# Create Kafka topics using the kafka-topics script (works across distributions)
 create_kafka_topics = BashOperator(
     task_id='create_kafka_topics',
     bash_command='''
-    kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:29092 --replication-factor 1 --partitions 1 --topic ipmi-metrics &&
-    kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:29092 --replication-factor 1 --partitions 1 --topic node-metrics &&
-    kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:29092 --replication-factor 1 --partitions 1 --topic gpu-metrics &&
-    kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:29092 --replication-factor 1 --partitions 1 --topic slurm-metrics
+    for topic in ipmi-metrics node-metrics gpu-metrics slurm-metrics; do
+        kafka-topics.sh --create --if-not-exists \
+            --bootstrap-server kafka:29092 \
+            --replication-factor 1 \
+            --partitions 1 \
+            --topic $topic || echo "Topic $topic already exists"
+    done
     ''',
     dag=dag,
 )
@@ -64,7 +68,7 @@ create_kafka_topics = BashOperator(
 # Initialize Cassandra schema and MinIO bucket
 init_storage = SparkSubmitOperator(
     task_id='init_storage',
-    application='/opt/airflow/dags/spark_scripts/metrics_processor.py',
+    application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conn_id='spark_default',
     conf={
         'spark.driver.memory': '1g',
@@ -84,7 +88,7 @@ init_storage = SparkSubmitOperator(
 # Start the Prometheus to Kafka connector
 start_prometheus_kafka = SparkSubmitOperator(
     task_id='start_prometheus_kafka',
-    application='/opt/airflow/dags/spark_scripts/prometheus_to_kafka.py',
+    application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'prometheus_to_kafka.py'),
     conn_id='spark_default',
     conf={
         'spark.driver.memory': '1g',
@@ -96,7 +100,7 @@ start_prometheus_kafka = SparkSubmitOperator(
 # Start the metrics processor
 start_metrics_processor = SparkSubmitOperator(
     task_id='start_metrics_processor',
-    application='/opt/airflow/dags/spark_scripts/metrics_processor.py',
+    application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conn_id='spark_default',
     conf={
         'spark.driver.memory': '1g',
@@ -113,14 +117,16 @@ start_metrics_processor = SparkSubmitOperator(
     dag=dag,
 )
 
-# Monitor pipeline health
+# Monitor pipeline health with cross-platform compatible commands
 monitor_pipeline = BashOperator(
     task_id='monitor_pipeline',
     bash_command='''
-    kafka-topics.sh --bootstrap-server kafka:29092 --describe &&
-    echo "Checking Kafka topics and partitions..." &&
-    mc config host add myminio http://minio:9000 minioadmin minioadmin &&
-    mc ls myminio/metrics/ &&
+    # Check Kafka topics
+    kafka-topics.sh --bootstrap-server kafka:29092 --list && \
+    echo "Checking Kafka topics and partitions..." && \
+    # Setup and check MinIO using mc
+    (mc config host add myminio http://minio:9000 minioadmin minioadmin || true) && \
+    mc ls myminio/metrics/ && \
     echo "Pipeline monitoring completed"
     ''',
     dag=dag,

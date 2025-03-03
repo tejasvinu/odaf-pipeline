@@ -238,6 +238,11 @@ services:
       - _AIRFLOW_WWW_USER_CREATE=true
       - _AIRFLOW_WWW_USER_USERNAME=airflow
       - _AIRFLOW_WWW_USER_PASSWORD=airflow
+      # Add MinIO environment variables
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=metrics
     volumes:
       - ./dags:/opt/airflow/dags
       - ./plugins:/opt/airflow/plugins
@@ -248,9 +253,21 @@ services:
       - "8081:8080"
     restart: unless-stopped
     networks:
-      - spark-network
-      - kafka-network
-      - airflow-network
+      spark-network:
+        aliases:
+          - airflow
+      kafka-network:
+        aliases:
+          - airflow
+      cassandra-network:
+        aliases:
+          - airflow
+      monitoring-network:
+        aliases:
+          - airflow
+      airflow-network:
+        aliases:
+          - airflow
     command: bash -c "airflow db upgrade && airflow users create -r Admin -u airflow -p airflow -f admin -l user -e admin@example.com && airflow webserver"
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "8080"]
@@ -272,6 +289,11 @@ services:
       - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+      # Add MinIO environment variables
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=metrics
     volumes:
       - ./dags:/opt/airflow/dags
       - ./plugins:/opt/airflow/plugins
@@ -281,9 +303,21 @@ services:
     command: airflow scheduler
     restart: unless-stopped
     networks:
-      - spark-network
-      - kafka-network
-      - airflow-network
+      spark-network:
+        aliases:
+          - airflow-scheduler
+      kafka-network:
+        aliases:
+          - airflow-scheduler
+      cassandra-network:
+        aliases:
+          - airflow-scheduler
+      monitoring-network:
+        aliases:
+          - airflow-scheduler
+      airflow-network:
+        aliases:
+          - airflow-scheduler
     healthcheck:
       test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
       interval: 30s
