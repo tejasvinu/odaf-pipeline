@@ -156,6 +156,18 @@ If you encounter permission issues with volumes, run:
 chmod -R 777 volumes/
 ```
 
+### Grafana Plugin Issues
+
+If you see errors related to Angular plugins in Grafana, modify the docker-compose.yml to:
+1. Remove the incompatible Angular plugins from `GF_INSTALL_PLUGINS`
+2. Add the feature toggle with `GF_FEATURE_TOGGLES=angularDeprecationUI=true`
+
+### Grafana Datasource Provisioning Errors
+
+If you see "Only one datasource per organization can be marked as default" error:
+1. Check the files in `grafana-provisioning/datasources/`
+2. Ensure only one datasource has `isDefault: true`
+
 ### Container Startup Problems
 
 Check container logs with:

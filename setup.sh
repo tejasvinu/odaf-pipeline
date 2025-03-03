@@ -42,8 +42,10 @@ EOL
 # Create directories for Docker volumes
 mkdir -p volumes/spark volumes/spark-worker-1 volumes/zookeeper_data volumes/kafka_data 
 mkdir -p volumes/cassandra_data volumes/minio_data volumes/postgres_data volumes/airflow_logs volumes/airflow_config
+mkdir -p volumes/grafana/dashboards
 mkdir -p notebooks dags plugins
 
 # Set proper permissions
 chmod -R 777 volumes notebooks dags plugins
+
 echo "Setup complete. You can now run 'docker-compose up -d' to start the services."
