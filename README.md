@@ -10,7 +10,22 @@ This repository contains an optimized data pipeline setup for development, featu
 - MinIO for S3-compatible object storage
 - Prometheus and Grafana for monitoring
 
-## Resource Optimization
+## 🚀 Quick Start
+
+1. Ensure Docker and Docker Compose are installed
+2. Clone this repository
+3. Run the setup script to prepare directories and configurations:
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+4. Start the services:
+```bash
+docker-compose up -d
+```
+5. Access services via the provided URLs (see [Service URLs](#service-urls))
+
+## 📊 Resource Optimization
 
 This setup has been optimized for local development by:
 
@@ -19,18 +34,22 @@ This setup has been optimized for local development by:
 3. Using local file paths for persistent storage
 4. Adding Airflow for workflow orchestration
 
-## Directory Structure
+## 📁 Directory Structure
 
 ```
 /odaf-pipeline/
-├── dags/                  # Airflow DAG definitions
-│   └── spark_scripts/     # Python scripts for Spark jobs
-├── notebooks/             # Jupyter notebooks
-├── plugins/               # Airflow plugins
-├── volumes/               # Persistent storage
+├── dags/                    # Airflow DAG definitions
+│   └── spark_scripts/       # Python scripts for Spark jobs
+├── grafana-provisioning/    # Grafana provisioning files
+│   ├── dashboards/          # Dashboard configurations
+│   └── datasources/         # Datasource configurations
+├── notebooks/               # Jupyter notebooks
+├── plugins/                 # Airflow plugins
+├── volumes/                 # Persistent storage
 │   ├── airflow_logs/
+│   ├── airflow_config/
 │   ├── cassandra_data/
-│   ├── data/              # Shared data directory
+│   ├── data/                # Shared data directory
 │   ├── grafana_data/
 │   ├── jupyter_data/
 │   ├── kafka_data/
@@ -38,65 +57,47 @@ This setup has been optimized for local development by:
 │   ├── postgres_data/
 │   ├── prometheus_data/
 │   ├── spark/
+│   ├── spark-worker-1/
 │   └── zookeeper_data/
-├── .env                   # Environment variables
-├── docker-compose.yml     # Services definition
-├── Dockerfile.jupyterlab  # JupyterLab container definition
-├── prometheus.yml         # Prometheus configuration
-└── spark-defaults.conf    # Spark configuration
+├── .env                     # Environment variables
+├── docker-compose.yml       # Services definition
+├── Dockerfile.airflow       # Airflow container definition
+├── Dockerfile.jupyterlab    # JupyterLab container definition
+├── prometheus.yml           # Prometheus configuration
+├── setup.sh                 # Setup script
+└── spark-defaults.conf      # Spark configuration
 ```
 
-## Getting Started
+## 🔗 Service URLs
 
-1. Ensure Docker and Docker Compose are installed
-2. Clone this repository
-3. Start the services:
+| Service       | URL                     | Credentials                            |
+|---------------|-------------------------|------------------------------------|
+| Spark UI      | http://localhost:8084   | -                                  |
+| Kafka UI      | http://localhost:8085   | -                                  |
+| JupyterLab    | http://localhost:8890   | No authentication                  |
+| Airflow       | http://localhost:8081   | Username: `airflow`<br>Password: `airflow` |
+| MinIO         | http://localhost:9001   | Username: `minioadmin`<br>Password: `minioadmin` |
+| Grafana       | http://localhost:3001   | Username: `admin`<br>Password: `admin` |
+| Prometheus    | http://localhost:9091   | -                                  |
+| PostgreSQL    | localhost:5432          | Username: `airflow`<br>Password: `airflow` |
 
-```bash
-docker-compose up -d
-```
+## 🔌 Service Ports
 
-4. Access services via the following URLs:
-   - Spark UI: http://localhost:8084
-   - Kafka UI: http://localhost:8085
-   - JupyterLab: http://localhost:8890
-   - Airflow: http://localhost:8080 (username: airflow, password: airflow)
-   - MinIO: http://localhost:9001 (username: minioadmin, password: minioadmin)
-   - Grafana: http://localhost:3000 (username: admin, password: admin)
-   - Prometheus: http://localhost:9090
+| Service            | Port(s)                  | Description                 |
+|--------------------|--------------------------|----------------------------|
+| **Spark Master**   | 8084, 7077              | UI, Spark Master           |
+| **Zookeeper**      | 2182                    | Client port                |
+| **Kafka**          | 9092                    | Broker                     |
+| **Kafka UI**       | 8085                    | Management UI              |
+| **Cassandra**      | 9042                    | CQL native transport       |
+| **MinIO**          | 9000, 9001              | API, Console               |
+| **Prometheus**     | 9091                    | Web UI                     |
+| **Grafana**        | 3001                    | Web UI                     |
+| **JupyterLab**     | 8890                    | Web UI                     |
+| **Airflow**        | 8081                    | Web UI                     |
+| **PostgreSQL**     | 5432                    | Database                   |
 
-## Service Ports
-
-The following ports are configured in the docker-compose setup:
-
-- **Spark Master**
-  - UI: 8084
-  - Spark Master: 7077
-- **Spark Worker**
-  - (No external ports exposed)
-- **Zookeeper**
-  - 2182
-- **Kafka**
-  - Broker: 9092
-- **Kafka UI**
-  - 8085
-- **Cassandra**
-  - 9042
-- **MinIO**
-  - API: 9000
-  - Console: 9001
-- **Prometheus**
-  - 9091
-- **Grafana**
-  - 3001
-- **JupyterLab**
-  - 8890 (maps to container port 8888)
-- **Airflow**
-  - 8081 (maps to container port 8080)
-- **PostgreSQL**
-  - 5432
-
-## Working with the Stack
+## 💻 Working with the Stack
 
 ### Running Spark Jobs via Airflow
 
@@ -130,7 +131,13 @@ spark = SparkSession.builder \
 print(f"Spark version: {spark.version}")
 ```
 
-## Scaling for Production
+### Monitoring with Grafana and Prometheus
+
+1. Access Grafana at http://localhost:3001 (username: `admin`, password: `admin`)
+2. The setup script has already configured Prometheus as a data source
+3. Create dashboards to monitor your Spark jobs, Kafka topics, and system resources
+
+## 🚀 Scaling for Production
 
 To scale this setup for production:
 - Increase memory allocations in docker-compose.yml
@@ -138,3 +145,38 @@ To scale this setup for production:
 - Configure authentication for services
 - Use external storage volumes
 - Set up proper networking and security
+
+## 🔧 Troubleshooting
+
+### Permission Issues
+
+If you encounter permission issues with volumes, run:
+
+```bash
+chmod -R 777 volumes/
+```
+
+### Container Startup Problems
+
+Check container logs with:
+
+```bash
+docker-compose logs [service-name]
+```
+
+### Monitoring Issues
+
+If Prometheus or Grafana don't appear to be working:
+
+1. Ensure both services are running: `docker-compose ps`
+2. Check if the monitoring network is properly created
+3. Verify that the provisioning files are correctly mounted
+
+## 📚 Additional Resources
+
+- [Apache Spark Documentation](https://spark.apache.org/docs/latest/)
+- [Apache Kafka Documentation](https://kafka.apache.org/documentation/)
+- [Apache Airflow Documentation](https://airflow.apache.org/docs/)
+- [JupyterLab Documentation](https://jupyterlab.readthedocs.io/)
+- [Prometheus Documentation](https://prometheus.io/docs/introduction/overview/)
+- [Grafana Documentation](https://grafana.com/docs/)
