@@ -178,10 +178,11 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
       - GF_FEATURE_TOGGLES=angularDeprecationUI=true
+      # Disable auto-provisioning to prevent conflicts
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning-disabled
     volumes:
       - ./volumes/grafana_data:/var/lib/grafana
-      - ./grafana-provisioning:/etc/grafana/provisioning:ro
-      - ./volumes/grafana/dashboards:/var/lib/grafana/dashboards
+      # We'll manually create the datasource through the UI to keep it simple
     depends_on:
       - prometheus
     restart: unless-stopped

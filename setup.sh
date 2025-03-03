@@ -9,7 +9,7 @@ mkdir -p grafana-provisioning/datasources grafana-provisioning/dashboards
 chmod -R 777 grafana-provisioning
 
 # Create a default datasource for Prometheus
-cat > grafana-provisioning/datasources/prometheus.yaml << EOL
+cat > grafana-provisioning/datasources/prometheus.yml << EOL
 apiVersion: 1
 
 datasources:
@@ -24,7 +24,7 @@ datasources:
 EOL
 
 # Create a default dashboard provider
-cat > grafana-provisioning/dashboards/default.yaml << EOL
+cat > grafana-provisioning/dashboards/dashboard.yml << EOL
 apiVersion: 1
 
 providers:
