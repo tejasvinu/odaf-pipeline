@@ -4,6 +4,7 @@ USER root
 RUN apt-get update && \
     apt-get install -y \
     netcat-traditional \
+    netcat \
     wget \
     kafkacat \
     procps \
@@ -15,8 +16,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     mkdir -p /opt/airflow/logs /opt/airflow/dags /opt/airflow/plugins /opt/airflow/config && \
     chown -R airflow:root /opt/airflow && \
-    # Set netcat-traditional as the default nc
-    update-alternatives --set nc /usr/bin/nc.traditional
+    # Create nc symlink if it doesn't exist
+    if [ ! -f /usr/bin/nc ]; then ln -s /usr/bin/netcat /usr/bin/nc; fi
 
 # Install Java correctly
 RUN apt-get update && \
@@ -33,7 +34,7 @@ RUN ln -sf /usr/lib/jvm/java-11-openjdk-amd64 /usr/lib/jvm/default-java && \
     echo "Symlinked java-11-openjdk-amd64 to /usr/lib/jvm/default-java" && \
     which java && \
     java -version && \
-    ln -s /bin/ps /usr/bin/ps && \
+    ln -s /bin/ps /usr/bin/ps 2>/dev/null || true && \
     # Make Java environment globally available
     echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> /etc/profile && \
     echo "export PATH=$JAVA_HOME/bin:$PATH" >> /etc/profile && \
