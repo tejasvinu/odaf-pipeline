@@ -70,20 +70,18 @@ init_storage = SparkSubmitOperator(
     task_id='init_storage',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conn_id='spark_default',
-    master='local[*]',  # Use local mode instead of YARN
     conf={
+        'spark.master': 'local[*]',  # Set master in conf dictionary
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
-        'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2'
+        'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2',
+        'spark.yarn.appMasterEnv.MINIO_ENDPOINT': 'http://minio:9000',
+        'spark.yarn.appMasterEnv.MINIO_ACCESS_KEY': 'minioadmin',
+        'spark.yarn.appMasterEnv.MINIO_SECRET_KEY': 'minioadmin',
+        'spark.yarn.appMasterEnv.MINIO_BUCKET': 'metrics',
+        'spark.yarn.appMasterEnv.JAVA_HOME': '/usr/lib/jvm/java-11-openjdk'
     },
     application_args=['--init-only'],
-    env_vars={
-        'MINIO_ENDPOINT': 'http://minio:9000',
-        'MINIO_ACCESS_KEY': 'minioadmin',
-        'MINIO_SECRET_KEY': 'minioadmin',
-        'MINIO_BUCKET': 'metrics',
-        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk'  # Set JAVA_HOME to a common location
-    },
     name='metrics-init',  # Add a meaningful name
     dag=dag,
 )
@@ -93,15 +91,13 @@ start_prometheus_kafka = SparkSubmitOperator(
     task_id='start_prometheus_kafka',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'prometheus_to_kafka.py'),
     conn_id='spark_default',
-    master='local[*]',  # Use local mode instead of YARN
     conf={
+        'spark.master': 'local[*]',  # Set master in conf dictionary
         'spark.driver.memory': '1g',
-        'spark.executor.memory': '1g'
+        'spark.executor.memory': '1g',
+        'spark.yarn.appMasterEnv.JAVA_HOME': '/usr/lib/jvm/java-11-openjdk'
     },
     name='prometheus-kafka',  # Add a meaningful name
-    env_vars={
-        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk'  # Set JAVA_HOME to a common location
-    },
     dag=dag,
 )
 
@@ -110,19 +106,17 @@ start_metrics_processor = SparkSubmitOperator(
     task_id='start_metrics_processor',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conn_id='spark_default',
-    master='local[*]',  # Use local mode instead of YARN
     conf={
+        'spark.master': 'local[*]',  # Set master in conf dictionary
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
         'spark.cores.max': '2',
-        'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2'
-    },
-    env_vars={
-        'MINIO_ENDPOINT': 'http://minio:9000',
-        'MINIO_ACCESS_KEY': 'minioadmin',
-        'MINIO_SECRET_KEY': 'minioadmin',
-        'MINIO_BUCKET': 'metrics',
-        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk'  # Set JAVA_HOME to a common location
+        'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2',
+        'spark.yarn.appMasterEnv.MINIO_ENDPOINT': 'http://minio:9000',
+        'spark.yarn.appMasterEnv.MINIO_ACCESS_KEY': 'minioadmin',
+        'spark.yarn.appMasterEnv.MINIO_SECRET_KEY': 'minioadmin', 
+        'spark.yarn.appMasterEnv.MINIO_BUCKET': 'metrics',
+        'spark.yarn.appMasterEnv.JAVA_HOME': '/usr/lib/jvm/java-11-openjdk'
     },
     name='metrics-processor',  # Add a meaningful name
     dag=dag,
