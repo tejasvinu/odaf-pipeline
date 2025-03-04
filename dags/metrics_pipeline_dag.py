@@ -25,6 +25,21 @@ dag = DAG(
     tags=['metrics', 'spark', 'kafka', 'cassandra', 'minio'],
 )
 
+# Set up Java environment
+setup_java = BashOperator(
+    task_id='setup_java',
+    bash_command='''
+    # Install OpenJDK if not present
+    if ! command -v java &> /dev/null; then
+        apt-get update && apt-get install -y openjdk-11-jdk
+    fi
+    # Export JAVA_HOME
+    export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+    echo "JAVA_HOME set to $JAVA_HOME"
+    ''',
+    dag=dag,
+)
+
 # Health checks for services using netcat (available in both busybox and full netcat)
 check_kafka = BashOperator(
     task_id='check_kafka',
@@ -70,19 +85,25 @@ init_storage = SparkSubmitOperator(
     task_id='init_storage',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conn_id='spark_default',
+    java_home='/usr/lib/jvm/java-11-openjdk-amd64',  # Explicitly set Java home
     conf={
-        'spark.master': 'local[*]',  # Set master in conf dictionary
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
         'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2',
-        'spark.yarn.appMasterEnv.MINIO_ENDPOINT': 'http://minio:9000',
-        'spark.yarn.appMasterEnv.MINIO_ACCESS_KEY': 'minioadmin',
-        'spark.yarn.appMasterEnv.MINIO_SECRET_KEY': 'minioadmin',
-        'spark.yarn.appMasterEnv.MINIO_BUCKET': 'metrics',
-        'spark.yarn.appMasterEnv.JAVA_HOME': '/usr/lib/jvm/java-11-openjdk'
     },
     application_args=['--init-only'],
-    name='metrics-init',  # Add a meaningful name
+    name='metrics-init',
+    verbose=True,
+    # Use env_vars instead of spark.yarn.appMasterEnv config
+    env_vars={
+        'MINIO_ENDPOINT': 'http://minio:9000',
+        'MINIO_ACCESS_KEY': 'minioadmin',
+        'MINIO_SECRET_KEY': 'minioadmin',
+        'MINIO_BUCKET': 'metrics',
+        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64'
+    },
+    # Force local mode by directly setting master
+    spark_binary="spark-submit --master local[*]",
     dag=dag,
 )
 
@@ -91,13 +112,18 @@ start_prometheus_kafka = SparkSubmitOperator(
     task_id='start_prometheus_kafka',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'prometheus_to_kafka.py'),
     conn_id='spark_default',
+    java_home='/usr/lib/jvm/java-11-openjdk-amd64',  # Explicitly set Java home
     conf={
-        'spark.master': 'local[*]',  # Set master in conf dictionary
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
-        'spark.yarn.appMasterEnv.JAVA_HOME': '/usr/lib/jvm/java-11-openjdk'
     },
-    name='prometheus-kafka',  # Add a meaningful name
+    name='prometheus-kafka',
+    # Use env_vars instead of spark.yarn.appMasterEnv config
+    env_vars={
+        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64'
+    },
+    # Force local mode by directly setting master
+    spark_binary="spark-submit --master local[*]",
     dag=dag,
 )
 
@@ -106,19 +132,24 @@ start_metrics_processor = SparkSubmitOperator(
     task_id='start_metrics_processor',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conn_id='spark_default',
+    java_home='/usr/lib/jvm/java-11-openjdk-amd64',  # Explicitly set Java home
     conf={
-        'spark.master': 'local[*]',  # Set master in conf dictionary
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
         'spark.cores.max': '2',
         'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2',
-        'spark.yarn.appMasterEnv.MINIO_ENDPOINT': 'http://minio:9000',
-        'spark.yarn.appMasterEnv.MINIO_ACCESS_KEY': 'minioadmin',
-        'spark.yarn.appMasterEnv.MINIO_SECRET_KEY': 'minioadmin', 
-        'spark.yarn.appMasterEnv.MINIO_BUCKET': 'metrics',
-        'spark.yarn.appMasterEnv.JAVA_HOME': '/usr/lib/jvm/java-11-openjdk'
     },
-    name='metrics-processor',  # Add a meaningful name
+    # Use env_vars instead of spark.yarn.appMasterEnv config
+    env_vars={
+        'MINIO_ENDPOINT': 'http://minio:9000',
+        'MINIO_ACCESS_KEY': 'minioadmin',
+        'MINIO_SECRET_KEY': 'minioadmin',
+        'MINIO_BUCKET': 'metrics',
+        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64'
+    },
+    name='metrics-processor',
+    # Force local mode by directly setting master
+    spark_binary="spark-submit --master local[*]",
     dag=dag,
 )
 
@@ -138,5 +169,5 @@ monitor_pipeline = BashOperator(
 )
 
 # Define task dependencies
-[check_kafka, check_cassandra, check_prometheus, check_minio] >> create_kafka_topics >> init_storage
+setup_java >> [check_kafka, check_cassandra, check_prometheus, check_minio] >> create_kafka_topics >> init_storage
 init_storage >> start_prometheus_kafka >> start_metrics_processor >> monitor_pipeline
