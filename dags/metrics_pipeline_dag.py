@@ -89,11 +89,11 @@ init_storage = SparkSubmitOperator(
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
         'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2',
+        'spark.master': 'local[*]',  # Set master directly in conf
     },
     application_args=['--init-only'],
     name='metrics-init',
     verbose=True,
-    # Use env_vars instead of spark.yarn.appMasterEnv config
     env_vars={
         'MINIO_ENDPOINT': 'http://minio:9000',
         'MINIO_ACCESS_KEY': 'minioadmin',
@@ -101,8 +101,7 @@ init_storage = SparkSubmitOperator(
         'MINIO_BUCKET': 'metrics',
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64'
     },
-    # Force local mode by directly setting master
-    spark_binary="spark-submit --master local[*]",
+    # Remove the problematic spark_binary parameter
     dag=dag,
 )
 
@@ -114,14 +113,13 @@ start_prometheus_kafka = SparkSubmitOperator(
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
+        'spark.master': 'local[*]',  # Set master directly in conf
     },
     name='prometheus-kafka',
-    # Use env_vars instead of spark.yarn.appMasterEnv config
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64'
     },
-    # Force local mode by directly setting master
-    spark_binary="spark-submit --master local[*]",
+    # Remove the problematic spark_binary parameter
     dag=dag,
 )
 
@@ -135,8 +133,8 @@ start_metrics_processor = SparkSubmitOperator(
         'spark.executor.memory': '1g',
         'spark.cores.max': '2',
         'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2',
+        'spark.master': 'local[*]',  # Set master directly in conf
     },
-    # Use env_vars instead of spark.yarn.appMasterEnv config
     env_vars={
         'MINIO_ENDPOINT': 'http://minio:9000',
         'MINIO_ACCESS_KEY': 'minioadmin',
@@ -145,8 +143,7 @@ start_metrics_processor = SparkSubmitOperator(
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64'
     },
     name='metrics-processor',
-    # Force local mode by directly setting master
-    spark_binary="spark-submit --master local[*]",
+    # Remove the problematic spark_binary parameter
     dag=dag,
 )
 
