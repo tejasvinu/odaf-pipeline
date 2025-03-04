@@ -84,7 +84,6 @@ create_kafka_topics = BashOperator(
 init_storage = SparkSubmitOperator(
     task_id='init_storage',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
-    conn_id=None,  # changed
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
@@ -95,12 +94,12 @@ init_storage = SparkSubmitOperator(
     name='metrics-init',
     verbose=True,
     env_vars={
+        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
         'MINIO_ENDPOINT': 'http://minio:9000',
         'MINIO_ACCESS_KEY': 'minioadmin',
         'MINIO_SECRET_KEY': 'minioadmin',
         'MINIO_BUCKET': 'metrics',
     },
-    # Remove the problematic spark_binary parameter
     dag=dag,
 )
 
@@ -108,7 +107,6 @@ init_storage = SparkSubmitOperator(
 start_prometheus_kafka = SparkSubmitOperator(
     task_id='start_prometheus_kafka',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'prometheus_to_kafka.py'),
-    conn_id=None,  # changed
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
@@ -116,8 +114,8 @@ start_prometheus_kafka = SparkSubmitOperator(
     },
     name='prometheus-kafka',
     env_vars={
+        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
     },
-    # Remove the problematic spark_binary parameter
     dag=dag,
 )
 
@@ -125,7 +123,6 @@ start_prometheus_kafka = SparkSubmitOperator(
 start_metrics_processor = SparkSubmitOperator(
     task_id='start_metrics_processor',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
-    conn_id=None,  # changed
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
@@ -134,13 +131,13 @@ start_metrics_processor = SparkSubmitOperator(
         'spark.master': 'local[*]',  # Set master directly in conf
     },
     env_vars={
+        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
         'MINIO_ENDPOINT': 'http://minio:9000',
         'MINIO_ACCESS_KEY': 'minioadmin',
         'MINIO_SECRET_KEY': 'minioadmin',
         'MINIO_BUCKET': 'metrics',
     },
     name='metrics-processor',
-    # Remove the problematic spark_binary parameter
     dag=dag,
 )
 
