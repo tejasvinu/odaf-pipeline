@@ -25,13 +25,29 @@ dag = DAG(
     tags=['metrics', 'spark', 'kafka', 'cassandra', 'minio'],
 )
 
-# Set up Java environment - removed as now handled in Dockerfile
+# Set up Java environment with improved error handling
 setup_java = BashOperator(
     task_id='setup_java',
     bash_command='''
     # Verify Java is installed and configured
-    which java && java -version && echo "JAVA_HOME=$JAVA_HOME"
+    echo "Checking Java installation..."
+    export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+    export PATH=$JAVA_HOME/bin:$PATH
+    
+    if command -v java >/dev/null 2>&1; then
+        which java
+        java -version
+        echo "JAVA_HOME=$JAVA_HOME"
+        ls -la $JAVA_HOME/bin/java || echo "Java binary not found in $JAVA_HOME/bin/"
+    else
+        echo "ERROR: Java not found in PATH"
+        echo "Current PATH=$PATH"
+        echo "Looking for Java in standard locations..."
+        find /usr/lib/jvm -name "java" 2>/dev/null || echo "No Java installation found"
+        exit 1
+    fi
     ''',
+    env={'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64', 'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}'},
     dag=dag,
 )
 
@@ -90,6 +106,7 @@ init_storage = SparkSubmitOperator(
     verbose=True,
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
+        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}',
         'MINIO_ENDPOINT': 'http://minio:9000',
         'MINIO_ACCESS_KEY': 'minioadmin',
         'MINIO_SECRET_KEY': 'minioadmin',
@@ -111,6 +128,7 @@ start_prometheus_kafka = SparkSubmitOperator(
     name='prometheus-kafka',
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
+        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}',
         'PROMETHEUS_URL': 'http://prometheus:9090',
         'KAFKA_BOOTSTRAP_SERVERS': 'kafka:29092',
     },
@@ -131,6 +149,7 @@ start_metrics_processor = SparkSubmitOperator(
     },
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
+        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}',
         'MINIO_ENDPOINT': 'http://minio:9000',
         'MINIO_ACCESS_KEY': 'minioadmin',
         'MINIO_SECRET_KEY': 'minioadmin',
@@ -159,6 +178,7 @@ monitor_pipeline = BashOperator(
 verify_env = BashOperator(
     task_id='verify_environment',
     bash_command='/opt/airflow/verify_environment.sh',
+    env={'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64', 'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}'},
     dag=dag,
 )
 
