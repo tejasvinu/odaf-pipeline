@@ -25,7 +25,10 @@ RUN apt-get update && \
     export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
     echo "JAVA_HOME set to $JAVA_HOME" >> /etc/profile
 
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+RUN ln -sf /usr/lib/jvm/java-11-openjdk-amd64 /usr/lib/jvm/default-java && \
+    echo "Symlinked java-11-openjdk-amd64 to /usr/lib/jvm/default-java" && \
+    ln -s /bin/ps /usr/bin/ps
+ENV JAVA_HOME=/usr/lib/jvm/default-java
 ENV PATH="$JAVA_HOME/bin:$PATH"
 
 USER airflow
