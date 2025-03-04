@@ -48,15 +48,24 @@ COPY verify_environment.sh /opt/airflow/
 # Make the script executable
 RUN chmod +x /opt/airflow/verify_environment.sh
 
-# Run the script during the image build (optional, for debugging)
-# CMD ["/opt/airflow/verify_environment.sh"] # Uncomment this line to run the script when the container starts
-
 USER airflow
+
+# Configure pip for more reliable downloads
+RUN pip install --upgrade pip && \
+    pip config set global.timeout 1000 && \
+    pip config set global.retries 10
+
+# Install smaller packages first
 RUN pip install --no-cache-dir \
-    apache-airflow-providers-apache-spark \
     boto3 \
     kafka-python \
     requests
+
+# Install PySpark separately with a specific version
+RUN pip install --no-cache-dir pyspark==3.3.2
+
+# Install Airflow provider package
+RUN pip install --no-cache-dir apache-airflow-providers-apache-spark==4.1.0
     
 # Add Java path for airflow user's shell
 RUN echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> ~/.bashrc && \
