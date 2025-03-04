@@ -100,7 +100,6 @@ init_storage = SparkSubmitOperator(
         'MINIO_SECRET_KEY': 'minioadmin',
         'MINIO_BUCKET': 'metrics',
     },
-    master='local[*]',
     dag=dag,
 )
 
@@ -117,7 +116,6 @@ start_prometheus_kafka = SparkSubmitOperator(
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
     },
-    master='local[*]',
     dag=dag,
 )
 
@@ -140,7 +138,6 @@ start_metrics_processor = SparkSubmitOperator(
         'MINIO_BUCKET': 'metrics',
     },
     name='metrics-processor',
-    master='local[*]',
     dag=dag,
 )
 
