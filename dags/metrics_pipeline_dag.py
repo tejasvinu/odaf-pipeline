@@ -99,7 +99,6 @@ init_storage = SparkSubmitOperator(
         'MINIO_ACCESS_KEY': 'minioadmin',
         'MINIO_SECRET_KEY': 'minioadmin',
         'MINIO_BUCKET': 'metrics',
-        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64'
     },
     # Remove the problematic spark_binary parameter
     dag=dag,
@@ -117,7 +116,6 @@ start_prometheus_kafka = SparkSubmitOperator(
     },
     name='prometheus-kafka',
     env_vars={
-        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64'
     },
     # Remove the problematic spark_binary parameter
     dag=dag,
@@ -140,7 +138,6 @@ start_metrics_processor = SparkSubmitOperator(
         'MINIO_ACCESS_KEY': 'minioadmin',
         'MINIO_SECRET_KEY': 'minioadmin',
         'MINIO_BUCKET': 'metrics',
-        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64'
     },
     name='metrics-processor',
     # Remove the problematic spark_binary parameter
