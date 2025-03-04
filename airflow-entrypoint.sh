@@ -6,6 +6,15 @@ echo "Current user: $(whoami)"
 echo "Current PATH: $PATH"
 echo "Airflow home: $AIRFLOW_HOME"
 
+# Check verify_environment script
+echo "Checking verify_environment.sh script:"
+ls -la /opt/airflow/verify_environment.sh || echo "verify_environment.sh not found!"
+if [ -f /opt/airflow/verify_environment.sh ]; then
+  # Make sure it's executable
+  chmod +x /opt/airflow/verify_environment.sh
+  echo "verify_environment.sh is executable"
+fi
+
 # Make sure airflow is in PATH
 export PATH="/home/airflow/.local/bin:$PATH"
 

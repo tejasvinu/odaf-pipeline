@@ -251,6 +251,7 @@ services:
       - ./plugins:/opt/airflow/plugins
       - ./volumes/airflow_logs:/opt/airflow/logs
       - ./volumes/airflow_config:/opt/airflow/config
+      - ./verify_environment.sh:/opt/airflow/verify_environment.sh  # Add direct mount for verification script
     user: "${AIRFLOW_UID:-50000}:0"
     ports:
       - "8081:8080"
@@ -306,6 +307,7 @@ services:
       - ./plugins:/opt/airflow/plugins
       - ./volumes/airflow_logs:/opt/airflow/logs
       - ./volumes/airflow_config:/opt/airflow/config
+      - ./verify_environment.sh:/opt/airflow/verify_environment.sh  # Add direct mount for verification script
     user: "${AIRFLOW_UID:-50000}:0"
     command: "scheduler"
     restart: unless-stopped

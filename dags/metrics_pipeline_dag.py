@@ -180,6 +180,8 @@ verify_env = BashOperator(
     bash_command='/opt/airflow/verify_environment.sh',  # Use direct path instead of template
     env={'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64', 'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}'},
     dag=dag,
+    # Disable templating for bash_command to prevent Jinja from looking for the file
+    template_fields=[]
 )
 
 # Define task dependencies
