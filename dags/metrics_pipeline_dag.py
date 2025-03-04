@@ -70,6 +70,7 @@ init_storage = SparkSubmitOperator(
     task_id='init_storage',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conn_id='spark_default',
+    master='local[*]',  # Use local mode instead of YARN
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
@@ -80,8 +81,10 @@ init_storage = SparkSubmitOperator(
         'MINIO_ENDPOINT': 'http://minio:9000',
         'MINIO_ACCESS_KEY': 'minioadmin',
         'MINIO_SECRET_KEY': 'minioadmin',
-        'MINIO_BUCKET': 'metrics'
+        'MINIO_BUCKET': 'metrics',
+        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk'  # Set JAVA_HOME to a common location
     },
+    name='metrics-init',  # Add a meaningful name
     dag=dag,
 )
 
@@ -90,9 +93,14 @@ start_prometheus_kafka = SparkSubmitOperator(
     task_id='start_prometheus_kafka',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'prometheus_to_kafka.py'),
     conn_id='spark_default',
+    master='local[*]',  # Use local mode instead of YARN
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g'
+    },
+    name='prometheus-kafka',  # Add a meaningful name
+    env_vars={
+        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk'  # Set JAVA_HOME to a common location
     },
     dag=dag,
 )
@@ -102,6 +110,7 @@ start_metrics_processor = SparkSubmitOperator(
     task_id='start_metrics_processor',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conn_id='spark_default',
+    master='local[*]',  # Use local mode instead of YARN
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
@@ -112,8 +121,10 @@ start_metrics_processor = SparkSubmitOperator(
         'MINIO_ENDPOINT': 'http://minio:9000',
         'MINIO_ACCESS_KEY': 'minioadmin',
         'MINIO_SECRET_KEY': 'minioadmin',
-        'MINIO_BUCKET': 'metrics'
+        'MINIO_BUCKET': 'metrics',
+        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk'  # Set JAVA_HOME to a common location
     },
+    name='metrics-processor',  # Add a meaningful name
     dag=dag,
 )
 
