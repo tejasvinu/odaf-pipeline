@@ -240,7 +240,7 @@ services:
       - _AIRFLOW_WWW_USER_PASSWORD=airflow
       # Add Java environment variables
       - JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-      - PATH=/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - PATH=/home/airflow/.local/bin:/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       # Add MinIO environment variables
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=minioadmin
@@ -271,12 +271,13 @@ services:
       airflow-network:
         aliases:
           - airflow
-    command: bash -c "airflow db upgrade && airflow users create -r Admin -u airflow -p airflow -f admin -l user -e admin@example.com && airflow webserver"
+    command: "webserver"
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob || airflow jobs check --job-type WebServer"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 30s
 
   # Airflow scheduler service
   airflow-scheduler:
@@ -294,7 +295,7 @@ services:
       - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
       # Add Java environment variables
       - JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-      - PATH=/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - PATH=/home/airflow/.local/bin:/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       # Add MinIO environment variables
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=minioadmin
@@ -306,7 +307,7 @@ services:
       - ./volumes/airflow_logs:/opt/airflow/logs
       - ./volumes/airflow_config:/opt/airflow/config
     user: "${AIRFLOW_UID:-50000}:0"
-    command: airflow scheduler
+    command: "scheduler"
     restart: unless-stopped
     networks:
       spark-network:
@@ -325,10 +326,11 @@ services:
         aliases:
           - airflow-scheduler
     healthcheck:
-      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 30s
 
   # PostgreSQL for Airflow metadata
   postgres:
