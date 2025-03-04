@@ -42,27 +42,17 @@ RUN ln -sf /usr/lib/jvm/java-11-openjdk-amd64 /usr/lib/jvm/default-java && \
     echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> /home/airflow/.bashrc && \
     echo "export PATH=$JAVA_HOME/bin:$PATH" >> /home/airflow/.bashrc
 
-# Copy the verification script
+# Copy the verification script and convert line endings
 COPY verify_environment.sh /opt/airflow/
+COPY airflow-entrypoint.sh /entrypoint.sh
 
-# Make the script executable
-RUN chmod +x /opt/airflow/verify_environment.sh
-
-# Create an entrypoint script to ensure airflow is in PATH
-RUN echo '#!/bin/bash\n\
-export PATH="/home/airflow/.local/bin:$PATH"\n\
-if [[ "$1" == "webserver" ]]; then\n\
-  airflow db upgrade && \n\
-  airflow users create -r Admin -u airflow -p airflow -f admin -l user -e admin@example.com --if-not-exists && \n\
-  airflow webserver\n\
-elif [[ "$1" == "scheduler" ]]; then\n\
-  airflow scheduler\n\
-else\n\
-  exec "$@"\n\
-fi' > /entrypoint.sh && \
-chmod +x /entrypoint.sh && \
-chown airflow:root /entrypoint.sh
-RUN sed -i 's/\r$//' /entrypoint.sh  # Convert to Unix line endings
+# Convert line endings and make scripts executable
+RUN sed -i 's/\r$//' /opt/airflow/verify_environment.sh && \
+    sed -i 's/\r$//' /entrypoint.sh && \
+    chmod +x /opt/airflow/verify_environment.sh && \
+    chmod +x /entrypoint.sh && \
+    chown airflow:root /opt/airflow/verify_environment.sh && \
+    chown airflow:root /entrypoint.sh
 
 USER airflow
 
