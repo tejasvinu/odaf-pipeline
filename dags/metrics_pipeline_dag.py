@@ -84,7 +84,7 @@ create_kafka_topics = BashOperator(
 init_storage = SparkSubmitOperator(
     task_id='init_storage',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
-    conn_id='spark_default',
+    conn_id=None,  # changed
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
@@ -108,7 +108,7 @@ init_storage = SparkSubmitOperator(
 start_prometheus_kafka = SparkSubmitOperator(
     task_id='start_prometheus_kafka',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'prometheus_to_kafka.py'),
-    conn_id='spark_default',
+    conn_id=None,  # changed
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
@@ -125,7 +125,7 @@ start_prometheus_kafka = SparkSubmitOperator(
 start_metrics_processor = SparkSubmitOperator(
     task_id='start_metrics_processor',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
-    conn_id='spark_default',
+    conn_id=None,  # changed
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
