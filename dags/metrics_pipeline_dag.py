@@ -177,8 +177,7 @@ monitor_pipeline = BashOperator(
 
 verify_env = BashOperator(
     task_id='verify_environment',
-    bash_command='{{ "verify_environment.sh" }}',  # Use templating to find the script
-    template_searchpath='/opt/airflow',  # Add this line to specify where to look for templates
+    bash_command='/opt/airflow/verify_environment.sh',  # Use direct path instead of template
     env={'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64', 'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}'},
     dag=dag,
 )

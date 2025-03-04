@@ -22,14 +22,14 @@ if [[ "$1" == "webserver" ]]; then
   airflow db upgrade
   
   echo "Creating Airflow admin user..."
+  # Remove --if-not-exists flag which is not supported in this version
   airflow users create \
     -r Admin \
     -u airflow \
     -p airflow \
     -f admin \
     -l user \
-    -e admin@example.com \
-    --if-not-exists
+    -e admin@example.com || true  # Added || true to continue even if user exists
   
   echo "Starting Airflow webserver..."
   exec airflow webserver
