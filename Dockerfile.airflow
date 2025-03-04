@@ -18,18 +18,31 @@ RUN apt-get update && \
     # Set netcat-traditional as the default nc
     update-alternatives --set nc /usr/bin/nc.traditional
 
-    # Install Java
-    apt-get update && apt-get install -y openjdk-11-jdk && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install Java correctly
+RUN apt-get update && \
+    apt-get install -y openjdk-11-jdk && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-    # Set JAVA_HOME environment variable
-    export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
-    echo "JAVA_HOME set to $JAVA_HOME" >> /etc/profile
+# Set JAVA_HOME environment variable properly
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV PATH="$JAVA_HOME/bin:$PATH"
 
+# Create symlink and verify Java installation
 RUN ln -sf /usr/lib/jvm/java-11-openjdk-amd64 /usr/lib/jvm/default-java && \
     echo "Symlinked java-11-openjdk-amd64 to /usr/lib/jvm/default-java" && \
+    which java && \
+    java -version && \
     ln -s /bin/ps /usr/bin/ps
-ENV JAVA_HOME=/usr/lib/jvm/default-java
-ENV PATH="$JAVA_HOME/bin:$PATH"
+
+# Copy the verification script
+COPY verify_environment.sh /opt/airflow/
+
+# Make the script executable
+RUN chmod +x /opt/airflow/verify_environment.sh
+
+# Run the script during the image build (optional, for debugging)
+# CMD ["/opt/airflow/verify_environment.sh"] # Uncomment this line to run the script when the container starts
 
 USER airflow
 RUN pip install --no-cache-dir \

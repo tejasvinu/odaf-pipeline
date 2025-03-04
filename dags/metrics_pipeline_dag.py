@@ -25,17 +25,12 @@ dag = DAG(
     tags=['metrics', 'spark', 'kafka', 'cassandra', 'minio'],
 )
 
-# Set up Java environment
+# Set up Java environment - removed as now handled in Dockerfile
 setup_java = BashOperator(
     task_id='setup_java',
     bash_command='''
-    # Install OpenJDK if not present
-    if ! command -v java &> /dev/null; then
-        apt-get update && apt-get install -y openjdk-11-jdk
-    fi
-    # Export JAVA_HOME
-    export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
-    echo "JAVA_HOME set to $JAVA_HOME"
+    # Verify Java is installed and configured
+    which java && java -version && echo "JAVA_HOME=$JAVA_HOME"
     ''',
     dag=dag,
 )
@@ -80,7 +75,7 @@ create_kafka_topics = BashOperator(
     dag=dag,
 )
 
-# Initialize Cassandra schema and MinIO bucket
+# Initialize Cassandra schema and MinIO bucket - fixed SparkSubmitOperator config
 init_storage = SparkSubmitOperator(
     task_id='init_storage',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
@@ -88,7 +83,7 @@ init_storage = SparkSubmitOperator(
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
         'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2',
-        'spark.master': 'local[*]',  # Set master directly in conf
+        'spark.master': 'local[*]',  # Use only one master configuration
     },
     application_args=['--init-only'],
     name='metrics-init',
@@ -101,25 +96,29 @@ init_storage = SparkSubmitOperator(
         'MINIO_BUCKET': 'metrics',
     },
     dag=dag,
+    conn_id=None,  # Explicitly set to None to avoid using yarn
 )
 
-# Start the Prometheus to Kafka connector
+# Start the Prometheus to Kafka connector - fixed config
 start_prometheus_kafka = SparkSubmitOperator(
     task_id='start_prometheus_kafka',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'prometheus_to_kafka.py'),
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
-        'spark.master': 'local[*]',  # Set master directly in conf
+        'spark.master': 'local[*]',
     },
     name='prometheus-kafka',
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
+        'PROMETHEUS_URL': 'http://prometheus:9090',
+        'KAFKA_BOOTSTRAP_SERVERS': 'kafka:29092',
     },
+    conn_id=None,  # Explicitly set to None
     dag=dag,
 )
 
-# Start the metrics processor
+# Start the metrics processor - fixed config
 start_metrics_processor = SparkSubmitOperator(
     task_id='start_metrics_processor',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
@@ -128,7 +127,7 @@ start_metrics_processor = SparkSubmitOperator(
         'spark.executor.memory': '1g',
         'spark.cores.max': '2',
         'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2',
-        'spark.master': 'local[*]',  # Set master directly in conf
+        'spark.master': 'local[*]',
     },
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
@@ -138,6 +137,7 @@ start_metrics_processor = SparkSubmitOperator(
         'MINIO_BUCKET': 'metrics',
     },
     name='metrics-processor',
+    conn_id=None,  # Explicitly set to None
     dag=dag,
 )
 
@@ -156,6 +156,12 @@ monitor_pipeline = BashOperator(
     dag=dag,
 )
 
+verify_env = BashOperator(
+    task_id='verify_environment',
+    bash_command='/opt/airflow/verify_environment.sh',
+    dag=dag,
+)
+
 # Define task dependencies
-setup_java >> [check_kafka, check_cassandra, check_prometheus, check_minio] >> create_kafka_topics >> init_storage
+setup_java >> [check_kafka, check_cassandra, check_prometheus, check_minio] >> create_kafka_topics >> init_storage >> verify_env
 init_storage >> start_prometheus_kafka >> start_metrics_processor >> monitor_pipeline
