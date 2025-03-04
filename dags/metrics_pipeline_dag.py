@@ -85,7 +85,6 @@ init_storage = SparkSubmitOperator(
     task_id='init_storage',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conn_id='spark_default',
-    java_home='/usr/lib/jvm/java-11-openjdk-amd64',  # Explicitly set Java home
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
@@ -112,7 +111,6 @@ start_prometheus_kafka = SparkSubmitOperator(
     task_id='start_prometheus_kafka',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'prometheus_to_kafka.py'),
     conn_id='spark_default',
-    java_home='/usr/lib/jvm/java-11-openjdk-amd64',  # Explicitly set Java home
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
@@ -132,7 +130,6 @@ start_metrics_processor = SparkSubmitOperator(
     task_id='start_metrics_processor',
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conn_id='spark_default',
-    java_home='/usr/lib/jvm/java-11-openjdk-amd64',  # Explicitly set Java home
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
