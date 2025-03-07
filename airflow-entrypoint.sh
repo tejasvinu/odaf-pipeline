@@ -1,5 +1,7 @@
 #!/bin/bash
-set -e
+
+# Don't exit on errors so the container doesn't crash
+set +e
 
 # Print debug info
 echo "Current user: $(whoami)"
@@ -8,10 +10,13 @@ echo "Airflow home: $AIRFLOW_HOME"
 
 # Check verify_environment script
 echo "Checking verify_environment.sh script:"
-ls -la /opt/airflow/verify_environment.sh || echo "verify_environment.sh not found!"
 if [ -f /opt/airflow/verify_environment.sh ]; then
-  # Try to make it executable but don't fail if we can't
-  chmod +x /opt/airflow/verify_environment.sh 2>/dev/null || echo "Note: Could not make verify_environment.sh executable. If you need to run it, use 'bash /opt/airflow/verify_environment.sh'"
+  ls -la /opt/airflow/verify_environment.sh || echo "Cannot list verify_environment.sh"
+  # Note: We're not trying to chmod here since it often fails with mounted volumes
+  # Instead, we'll always use bash to execute it
+  echo "Note: To run verification script, use 'bash /opt/airflow/verify_environment.sh'"
+else
+  echo "verify_environment.sh not found!"
 fi
 
 # Make sure airflow is in PATH
@@ -24,20 +29,20 @@ python -m pip list | grep airflow || echo "Airflow not found in pip list"
 # Initialize the database if needed
 if [[ "$1" == "webserver" ]]; then
   echo "Initializing Airflow database..."
-  airflow db init
+  airflow db init || echo "Failed to initialize database, but continuing..."
   
   echo "Upgrading Airflow database..."
-  airflow db upgrade
+  airflow db upgrade || echo "Failed to upgrade database, but continuing..."
   
   echo "Creating Airflow admin user..."
-  # Remove --if-not-exists flag which is not supported in this version
+  # Try to create user but don't fail if it exists
   airflow users create \
     -r Admin \
     -u airflow \
     -p airflow \
     -f admin \
     -l user \
-    -e admin@example.com || true  # Added || true to continue even if user exists
+    -e admin@example.com 2>/dev/null || echo "User may already exist, continuing..."
   
   echo "Starting Airflow webserver..."
   exec airflow webserver
