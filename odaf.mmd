@@ -1,0 +1,124 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#ffffff",
+    "primaryTextColor": "#000000",
+    "primaryBorderColor": "#000000",
+    "lineColor": "#000000",
+    "secondaryColor": "#f0f0f0",
+    "tertiaryColor": "#e8e8e8"
+  },
+  "flowchart": {
+    "htmlLabels": true,
+    "curve": "basis",
+    "diagramPadding": 20,
+    "nodeSpacing": 10,
+    "rankSpacing": 20,
+    "wrap": false
+  }
+}}%%
+flowchart TB
+    %% SYSTEM BOUNDARY
+    subgraph ODAF["ODAF ANALYTICS PIPELINE"]
+    direction TB
+    style ODAF fill:#ffffff,stroke:#000000,stroke-width:3px,font-size:22px,font-weight:bold
+    
+    %% DATA SOURCES - VERTICAL ORIENTATION FOR COMPACTNESS
+    subgraph SRC["DATA SOURCES"]
+        direction TB
+        style SRC fill:#e6f7ff,stroke:#000000,stroke-width:2px,font-size:18px,font-weight:bold
+        IPM["IPMI<br>METRICS"] --- NOD["NODE<br>METRICS"] --- GPU["GPU<br>METRICS"] --- SLM["SLURM<br>METRICS"]
+        style IPM font-size:16px,font-weight:bold,padding:3px
+        style NOD font-size:16px,font-weight:bold,padding:3px
+        style GPU font-size:16px,font-weight:bold,padding:3px
+        style SLM font-size:16px,font-weight:bold,padding:3px
+    end
+    
+    %% PRIMARY LAYERS - VERTICAL STACK
+    subgraph DL["I. DATA MANAGEMENT"]
+        direction TB
+        style DL fill:#ffffff,stroke:#000000,stroke-width:2px,font-size:18px,font-weight:bold
+        subgraph STR["A. Stream Processing"]
+            direction TB
+            style STR fill:#f0f0f0,stroke:#000000,stroke-width:1.5px,font-size:16px,font-weight:bold
+            ZKP["ZOOKEEPER"] --> KFK["KAFKA"] --- KUI["KAFKA UI"]
+            style KFK font-size:14px,font-weight:bold,padding:4px
+            style ZKP font-size:14px,font-weight:bold,padding:4px
+            style KUI font-size:14px,font-weight:bold,padding:4px
+        end
+        
+        subgraph STO["B. Persistence"]
+            direction TB
+            style STO fill:#f0f0f0,stroke:#000000,stroke-width:1.5px,font-size:16px,font-weight:bold
+            MNO["MINIO<br>Object"] --- CAS["CASSANDRA<br>TimeSeries"] --- PGS["POSTGRESQL<br>Relational"]
+            style MNO font-size:14px,font-weight:bold,padding:4px
+            style CAS font-size:14px,font-weight:bold,padding:4px
+            style PGS font-size:14px,font-weight:bold,padding:4px
+        end
+    end
+    
+    subgraph CL["II. COMPUTATION"]
+        direction TB
+        style CL fill:#ffffff,stroke:#000000,stroke-width:2px,font-size:18px,font-weight:bold
+        subgraph DSP["C. Processing"]
+            direction TB
+            style DSP fill:#f0f0f0,stroke:#000000,stroke-width:1.5px,font-size:16px,font-weight:bold
+            SPW["SPARK<br>WORKER"] --> SPM["SPARK<br>MASTER"] --- JYP["JUPYTER<br>LAB"]
+            style SPM font-size:14px,font-weight:bold,padding:4px
+            style SPW font-size:14px,font-weight:bold,padding:4px
+            style JYP font-size:14px,font-weight:bold,padding:4px
+        end
+    end
+    
+    subgraph OL["III. ORCHESTRATION"]
+        direction TB
+        style OL fill:#ffffff,stroke:#000000,stroke-width:2px,font-size:18px,font-weight:bold
+        subgraph WFS["D. Workflow"]
+            direction TB
+            style WFS fill:#f0f0f0,stroke:#000000,stroke-width:1.5px,font-size:16px,font-weight:bold
+            AFW["AIRFLOW<br>WEBSERVER"] --> AFS["AIRFLOW<br>SCHEDULER"]
+            style AFW font-size:14px,font-weight:bold,padding:4px
+            style AFS font-size:14px,font-weight:bold,padding:4px
+        end
+    end
+    
+    subgraph ML["IV. MONITORING"]
+        direction TB
+        style ML fill:#ffffff,stroke:#000000,stroke-width:1.5px,font-size:18px,font-weight:bold
+        GRF["GRAFANA"] --> PRM["PROMETHEUS"]
+        style GRF font-size:14px,font-weight:bold,padding:4px
+        style PRM font-size:14px,font-weight:bold,padding:4px
+    end
+    
+    %% DATA FLOW - COMPACT CONNECTIONS WITH LABELS
+    IPM -- "Hardware Metrics" --> KFK
+    NOD -- "System Metrics" --> KFK
+    GPU -- "Accelerator Metrics" --> KFK
+    SLM -- "Job Metrics" --> KFK
+    PRM -- "Performance Metrics" --> KFK
+    
+    %% CRITICAL DATA FLOWS - LABELED FOR CLARITY
+    KFK -- "Raw Data Storage" --> MNO
+    KFK -- "Streaming Data" --> SPM
+    MNO -- "Batch Processing" --> SPM
+    CAS -- "Time Series Query" --> SPM
+    JYP -. "Ad-hoc Analysis" .-> CAS
+    JYP -. "Exploration" .-> KFK
+    JYP -. "Data Access" .-> MNO
+    AFS -- "Job Status" --> PGS
+    AFS -- "Task Execution" --> SPM
+    AFS -. "Pipeline Control" .-> KFK
+    AFS -. "Data Management" .-> MNO
+    PRM -- "Compute Monitoring" --> SPM
+    PRM -- "Storage Monitoring" --> CAS
+    PRM -- "Workflow Monitoring" --> AFW
+    
+    %% LEGEND - SIMPLIFIED AND COMPACT
+    subgraph LG["LEGEND"]
+        direction TB
+        style LG fill:#ffffff,stroke:#000000,stroke-width:1px,font-size:14px,font-weight:bold
+        L1["→: Data Flow"] --- L2["-.->: Control Flow"]
+        style L1 font-size:12px,padding:2px
+        style L2 font-size:12px,padding:2px
+    end
+    end

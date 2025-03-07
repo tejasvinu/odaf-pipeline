@@ -46,6 +46,11 @@ RUN ln -sf /usr/lib/jvm/java-11-openjdk-amd64 /usr/lib/jvm/default-java && \
 COPY verify_environment.sh /opt/airflow/
 COPY airflow-entrypoint.sh /entrypoint.sh
 
+# Create a wrapper script that can safely execute the verify_environment.sh script
+RUN echo '#!/bin/bash' > /usr/local/bin/verify_env && \
+    echo 'bash /opt/airflow/verify_environment.sh "$@"' >> /usr/local/bin/verify_env && \
+    chmod +x /usr/local/bin/verify_env
+
 # Convert line endings and make scripts executable
 RUN sed -i 's/\r$//' /opt/airflow/verify_environment.sh && \
     sed -i 's/\r$//' /entrypoint.sh && \

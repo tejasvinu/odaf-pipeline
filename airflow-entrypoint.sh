@@ -10,9 +10,8 @@ echo "Airflow home: $AIRFLOW_HOME"
 echo "Checking verify_environment.sh script:"
 ls -la /opt/airflow/verify_environment.sh || echo "verify_environment.sh not found!"
 if [ -f /opt/airflow/verify_environment.sh ]; then
-  # Make sure it's executable
-  chmod +x /opt/airflow/verify_environment.sh
-  echo "verify_environment.sh is executable"
+  # Try to make it executable but don't fail if we can't
+  chmod +x /opt/airflow/verify_environment.sh 2>/dev/null || echo "Note: Could not make verify_environment.sh executable. If you need to run it, use 'bash /opt/airflow/verify_environment.sh'"
 fi
 
 # Make sure airflow is in PATH
