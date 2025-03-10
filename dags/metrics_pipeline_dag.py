@@ -175,9 +175,52 @@ monitor_pipeline = BashOperator(
     dag=dag,
 )
 
+# Updated verify_environment task to include inline verification script
 verify_env = BashOperator(
     task_id='verify_environment',
-    bash_command='/opt/airflow/verify_environment.sh',  # Use direct path instead of template
+    bash_command='''
+    # Inline verification script that doesn't depend on external files
+    echo "=== System Information ==="
+    uname -a
+    echo ""
+    
+    # Check Java installation
+    echo "=== Java Installation ==="
+    which java
+    java -version
+    echo "JAVA_HOME=$JAVA_HOME"
+    ls -la $JAVA_HOME/bin/java 2>/dev/null || echo "Java binary not found in expected location"
+    echo ""
+    
+    # Check essential commands
+    echo "=== Essential Commands ==="
+    for cmd in ps nc wget curl kafka-topics.sh spark-submit mc; do
+      which $cmd 2>/dev/null || echo "$cmd not found"
+    done
+    echo ""
+    
+    # Check Spark installation
+    echo "=== Spark Installation ==="
+    spark-submit --version || echo "spark-submit not working properly"
+    echo ""
+    
+    # Check directory permissions
+    echo "=== Directory Permissions ==="
+    ls -la /opt/airflow/dags
+    ls -la /opt/airflow/logs
+    echo ""
+    
+    # Check network connectivity to services
+    echo "=== Network Connectivity ==="
+    for service in kafka:9092 cassandra:9042 prometheus:9090 minio:9000; do
+      host=$(echo $service | cut -d':' -f1)
+      port=$(echo $service | cut -d':' -f2)
+      echo -n "Checking $service: "
+      nc -z -v -w5 $host $port 2>&1 || echo "Failed to connect to $service"
+    done
+    echo ""
+    echo "=== Environment Verification Complete ==="
+    ''',
     env={'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64', 'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}'},
     dag=dag
 )
