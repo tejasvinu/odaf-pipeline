@@ -1,0 +1,12 @@
+{
+    "storage-driver": "overlay2",
+    "storage-opts": [
+        "overlay2.override_kernel_check=true"
+    ],
+    "log-driver": "journald",
+    "live-restore": true,
+    "userland-proxy": false,
+    "no-new-privileges": false,
+    "selinux-enabled": true,
+    "dns": ["8.8.8.8", "8.8.4.4"]
+}

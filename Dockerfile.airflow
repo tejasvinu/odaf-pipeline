@@ -79,13 +79,18 @@ RUN echo '#!/bin/bash' > /opt/airflow/setup_spark_connection.sh && \
 # Create a comprehensive fix for airflow installation issues
 RUN echo '#!/bin/bash' > /fix_airflow.sh && \
     echo 'echo "Fixing Airflow installation issues..."' >> /fix_airflow.sh && \
+    echo 'export PATH=/home/airflow/.local/bin:$PATH' >> /fix_airflow.sh && \
+    echo 'export PYTHONPATH=/home/airflow/.local/lib/python3.7/site-packages:$PYTHONPATH' >> /fix_airflow.sh && \
     echo 'su - airflow -c "pip install --upgrade pip"' >> /fix_airflow.sh && \
-    echo 'su - airflow -c "pip install --force-reinstall apache-airflow==2.5.0"' >> /fix_airflow.sh && \
-    echo 'su - airflow -c "pip install --force-reinstall apache-airflow-providers-apache-spark==4.1.0"' >> /fix_airflow.sh && \
-    echo 'su - airflow -c "pip install --force-reinstall boto3 kafka-python requests"' >> /fix_airflow.sh && \
+    echo 'su - airflow -c "pip uninstall -y apache-airflow apache-airflow-providers-apache-spark || true"' >> /fix_airflow.sh && \
+    echo 'su - airflow -c "pip cache purge"' >> /fix_airflow.sh && \
+    echo 'su - airflow -c "pip install --no-cache-dir apache-airflow==2.5.0"' >> /fix_airflow.sh && \
+    echo 'su - airflow -c "pip install --no-cache-dir apache-airflow-providers-apache-spark==4.1.0"' >> /fix_airflow.sh && \
+    echo 'su - airflow -c "pip install --no-cache-dir boto3 kafka-python requests pyspark==3.3.2"' >> /fix_airflow.sh && \
     echo 'echo "Verifying Airflow installation..."' >> /fix_airflow.sh && \
     echo 'su - airflow -c "python -c \"import airflow; print(f\\\"Airflow version: {airflow.__version__}\\\")\" || echo Airflow import failed"' >> /fix_airflow.sh && \
-    echo 'mkdir -p /opt/airflow/logs/scheduler /opt/airflow/logs/dag_processor' >> /fix_airflow.sh && \
+    echo 'mkdir -p /opt/airflow/logs/scheduler /opt/airflow/logs/dag_processor /opt/airflow/dags /opt/airflow/plugins' >> /fix_airflow.sh && \
+    echo 'chown -R airflow:root /opt/airflow' >> /fix_airflow.sh && \
     echo 'chmod -R 777 /opt/airflow' >> /fix_airflow.sh && \
     echo 'echo "Airflow fix completed"' >> /fix_airflow.sh && \
     chmod +x /fix_airflow.sh
