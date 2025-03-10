@@ -76,8 +76,24 @@ RUN echo '#!/bin/bash' > /opt/airflow/setup_spark_connection.sh && \
     echo 'echo "spark_default connection created successfully"' >> /opt/airflow/setup_spark_connection.sh && \
     chmod +x /opt/airflow/setup_spark_connection.sh
 
+# Create a comprehensive fix for airflow installation issues
+RUN echo '#!/bin/bash' > /fix_airflow.sh && \
+    echo 'echo "Fixing Airflow installation issues..."' >> /fix_airflow.sh && \
+    echo 'su - airflow -c "pip install --upgrade pip"' >> /fix_airflow.sh && \
+    echo 'su - airflow -c "pip install --force-reinstall apache-airflow==2.5.0"' >> /fix_airflow.sh && \
+    echo 'su - airflow -c "pip install --force-reinstall apache-airflow-providers-apache-spark==4.1.0"' >> /fix_airflow.sh && \
+    echo 'su - airflow -c "pip install --force-reinstall boto3 kafka-python requests"' >> /fix_airflow.sh && \
+    echo 'echo "Verifying Airflow installation..."' >> /fix_airflow.sh && \
+    echo 'su - airflow -c "python -c \"import airflow; print(f\\\"Airflow version: {airflow.__version__}\\\")\" || echo Airflow import failed"' >> /fix_airflow.sh && \
+    echo 'mkdir -p /opt/airflow/logs/scheduler /opt/airflow/logs/dag_processor' >> /fix_airflow.sh && \
+    echo 'chmod -R 777 /opt/airflow' >> /fix_airflow.sh && \
+    echo 'echo "Airflow fix completed"' >> /fix_airflow.sh && \
+    chmod +x /fix_airflow.sh
+
 # Modify the entrypoint.sh to set up Spark connection on startup
 RUN sed -i '/^exec "\/\$\@"/i \
+# Run Airflow fix script\n\
+/fix_airflow.sh\n\
 # Add spark connection setup if needed\n\
 if [[ "$1" = "webserver" ]]; then\n\
   echo "Setting up Spark connection on webserver startup..."\n\
@@ -88,12 +104,20 @@ mkdir -p /opt/airflow/logs/scheduler /opt/airflow/logs/dag_processor\n\
 chmod -R 777 /opt/airflow\n\
 ' /entrypoint.sh
 
+# Add a shortcut script that can be run manually to fix airflow
+RUN echo '#!/bin/bash' > /usr/local/bin/fix_airflow && \
+    echo '/fix_airflow.sh' >> /usr/local/bin/fix_airflow && \
+    chmod +x /usr/local/bin/fix_airflow
+
 USER airflow
 
 # Configure pip for more reliable downloads
 RUN pip install --upgrade pip && \
     pip config set global.timeout 1000 && \
     pip config set global.retries 10
+
+# Install Apache Airflow separately with specific version
+RUN pip install --no-cache-dir apache-airflow==2.5.0
 
 # Install smaller packages first
 RUN pip install --no-cache-dir \
@@ -104,7 +128,7 @@ RUN pip install --no-cache-dir \
 # Install PySpark separately with a specific version
 RUN pip install --no-cache-dir pyspark==3.3.2
 
-# Install Airflow provider package
+# Install Airflow provider package explicitly
 RUN pip install --no-cache-dir apache-airflow-providers-apache-spark==4.1.0
     
 # Add Java and Airflow paths for airflow user's shell
@@ -118,6 +142,7 @@ RUN mkdir -p /home/airflow/.local/bin && \
 
 # Make sure airflow is in the PATH
 ENV PATH="/home/airflow/.local/bin:${PATH}"
+ENV PYTHONPATH="/home/airflow/.local/lib/python3.7/site-packages:${PYTHONPATH}"
 
 # Switch back to root to ensure proper permissions before starting
 USER root

@@ -6,12 +6,16 @@ Requires=docker.service
 [Service]
 Type=simple
 User=root
+Group=root
 WorkingDirectory=/opt/odaf-pipeline
+ExecStartPre=/bin/mkdir -p /opt/odaf-pipeline
+ExecStartPre=/bin/chown -R root:root /opt/odaf-pipeline
 ExecStart=/opt/odaf-pipeline/odaf_startup.sh
-Restart=on-failure
+Restart=always
 RestartSec=10
-StandardOutput=syslog
-StandardError=syslog
+TimeoutStartSec=300
+StandardOutput=journal
+StandardError=journal
 SyslogIdentifier=odaf-pipeline
 
 [Install]
