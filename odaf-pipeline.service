@@ -1,15 +1,18 @@
 [Unit]
-Description=ODAF Pipeline Service
-Requires=docker.service
+Description=ODAF Data Analytics Pipeline
 After=docker.service
+Requires=docker.service
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=simple
+User=root
 WorkingDirectory=/opt/odaf-pipeline
-ExecStart=/usr/local/bin/docker-compose up -d
-ExecStop=/usr/local/bin/docker-compose down
-TimeoutStartSec=0
+ExecStart=/opt/odaf-pipeline/odaf_startup.sh
+Restart=on-failure
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=odaf-pipeline
 
 [Install]
 WantedBy=multi-user.target

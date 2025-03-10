@@ -15,7 +15,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     mkdir -p /opt/airflow/logs /opt/airflow/dags /opt/airflow/plugins /opt/airflow/config && \
-    chown -R airflow:root /opt/airflow && \
+    chmod -R 777 /opt/airflow && \
     # Create nc symlink if it doesn't exist
     if [ ! -f /usr/bin/nc ]; then ln -s /usr/bin/netcat /usr/bin/nc; fi
 
@@ -82,7 +82,11 @@ RUN sed -i '/^exec "\/\$\@"/i \
 if [[ "$1" = "webserver" ]]; then\n\
   echo "Setting up Spark connection on webserver startup..."\n\
   nohup bash -c "sleep 30 && /opt/airflow/setup_spark_connection.sh" &\n\
-fi\n' /entrypoint.sh
+fi\n\
+# Create required directories with proper permissions\n\
+mkdir -p /opt/airflow/logs/scheduler /opt/airflow/logs/dag_processor\n\
+chmod -R 777 /opt/airflow\n\
+' /entrypoint.sh
 
 USER airflow
 
@@ -115,8 +119,17 @@ RUN mkdir -p /home/airflow/.local/bin && \
 # Make sure airflow is in the PATH
 ENV PATH="/home/airflow/.local/bin:${PATH}"
 
+# Switch back to root to ensure proper permissions before starting
+USER root
+# This ensures the container will create required directories with proper permissions at startup
+RUN echo '#!/bin/bash' > /fix_permissions.sh && \
+    echo 'mkdir -p /opt/airflow/logs/scheduler /opt/airflow/logs/dag_processor' >> /fix_permissions.sh && \
+    echo 'chmod -R 777 /opt/airflow' >> /fix_permissions.sh && \
+    echo 'exec "$@"' >> /fix_permissions.sh && \
+    chmod +x /fix_permissions.sh
+
 # Set workdir to airflow home
 WORKDIR /opt/airflow
 
-# Use our custom entrypoint
-ENTRYPOINT ["/entrypoint.sh"]
+# Use our custom entrypoint wrapper
+ENTRYPOINT ["/fix_permissions.sh", "/entrypoint.sh"]
