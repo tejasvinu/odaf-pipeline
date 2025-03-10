@@ -86,6 +86,10 @@ RUN pip install --no-cache-dir apache-airflow-providers-apache-spark==4.1.0
 RUN echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> ~/.bashrc && \
     echo "export PATH=/home/airflow/.local/bin:\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
 
+# Create symbolic link for spark-submit to make it available in PATH
+RUN ln -sf $(python -c "import pyspark; print(pyspark.__path__[0])")/bin/spark-submit /home/airflow/.local/bin/spark-submit && \
+    chmod +x /home/airflow/.local/bin/spark-submit
+
 # Make sure airflow is in the PATH
 ENV PATH="/home/airflow/.local/bin:${PATH}"
 

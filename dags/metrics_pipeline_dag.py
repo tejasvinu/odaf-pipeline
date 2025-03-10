@@ -113,7 +113,7 @@ init_storage = SparkSubmitOperator(
         'MINIO_BUCKET': 'metrics',
     },
     dag=dag,
-    conn_id=None,  # Explicitly set to None to avoid using yarn
+    conn_id='spark_default',  # Changed from None to 'spark_default' to avoid NoneType error
 )
 
 # Start the Prometheus to Kafka connector - fixed config
@@ -132,7 +132,7 @@ start_prometheus_kafka = SparkSubmitOperator(
         'PROMETHEUS_URL': 'http://prometheus:9090',
         'KAFKA_BOOTSTRAP_SERVERS': 'kafka:29092',
     },
-    conn_id=None,  # Explicitly set to None
+    conn_id='spark_default',  # Changed from None to 'spark_default' to avoid NoneType error
     dag=dag,
 )
 
@@ -156,7 +156,7 @@ start_metrics_processor = SparkSubmitOperator(
         'MINIO_BUCKET': 'metrics',
     },
     name='metrics-processor',
-    conn_id=None,  # Explicitly set to None
+    conn_id='spark_default',  # Changed from None to 'spark_default' to avoid NoneType error
     dag=dag,
 )
 
