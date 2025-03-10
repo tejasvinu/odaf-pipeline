@@ -33,13 +33,13 @@ setup_java = BashOperator(
     echo "Checking Java installation..."
     export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
     export PATH=$JAVA_HOME/bin:$PATH
-    
+
     if command -v java >/dev/null 2>&1; then
         which java
         java -version
         echo "JAVA_HOME=$JAVA_HOME"
         ls -la $JAVA_HOME/bin/java || echo "Java binary not found in $JAVA_HOME/bin/"
-    else
+    else:
         echo "ERROR: Java not found in PATH"
         echo "Current PATH=$PATH"
         echo "Looking for Java in standard locations..."
@@ -99,21 +99,21 @@ init_storage = SparkSubmitOperator(
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
         'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2',
-        'spark.master': 'local[*]',  # Use only one master configuration
+        # 'spark.master': 'local[*]',  # Remove this line. Rely on connection.
     },
     application_args=['--init-only'],
     name='metrics-init',
     verbose=True,
-    env_vars={
+    env_vars={  # PATH should pick up spark-submit from the symlink
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
-        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}',
+        'PATH': '/home/airflow/.local/bin:/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}',
         'MINIO_ENDPOINT': 'http://minio:9000',
         'MINIO_ACCESS_KEY': 'minioadmin',
         'MINIO_SECRET_KEY': 'minioadmin',
         'MINIO_BUCKET': 'metrics',
     },
     dag=dag,
-    conn_id='spark_default',  # Changed from None to 'spark_default' to avoid NoneType error
+    conn_id='spark_default',  # Use the spark_default connection
 )
 
 # Start the Prometheus to Kafka connector - fixed config
@@ -123,16 +123,16 @@ start_prometheus_kafka = SparkSubmitOperator(
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
-        'spark.master': 'local[*]',
+        # 'spark.master': 'local[*]', # Remove this line. Rely on connection.
     },
     name='prometheus-kafka',
-    env_vars={
+    env_vars={ # PATH should pick up spark-submit from the symlink
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
-        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}',
+        'PATH': '/home/airflow/.local/bin:/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}',
         'PROMETHEUS_URL': 'http://prometheus:9090',
         'KAFKA_BOOTSTRAP_SERVERS': 'kafka:29092',
     },
-    conn_id='spark_default',  # Changed from None to 'spark_default' to avoid NoneType error
+    conn_id='spark_default',
     dag=dag,
 )
 
@@ -145,18 +145,18 @@ start_metrics_processor = SparkSubmitOperator(
         'spark.executor.memory': '1g',
         'spark.cores.max': '2',
         'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2',
-        'spark.master': 'local[*]',
+        # 'spark.master': 'local[*]', # Remove this line. Rely on connection.
     },
-    env_vars={
+    env_vars={ # PATH should pick up spark-submit from the symlink
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
-        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}',
+        'PATH': '/home/airflow/.local/bin:/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}',
         'MINIO_ENDPOINT': 'http://minio:9000',
         'MINIO_ACCESS_KEY': 'minioadmin',
         'MINIO_SECRET_KEY': 'minioadmin',
         'MINIO_BUCKET': 'metrics',
     },
     name='metrics-processor',
-    conn_id='spark_default',  # Changed from None to 'spark_default' to avoid NoneType error
+    conn_id='spark_default',
     dag=dag,
 )
 
@@ -175,54 +175,11 @@ monitor_pipeline = BashOperator(
     dag=dag,
 )
 
-# Updated verify_environment task to include inline verification script
 verify_env = BashOperator(
     task_id='verify_environment',
-    bash_command='''
-    # Inline verification script that doesn't depend on external files
-    echo "=== System Information ==="
-    uname -a
-    echo ""
-    
-    # Check Java installation
-    echo "=== Java Installation ==="
-    which java
-    java -version
-    echo "JAVA_HOME=$JAVA_HOME"
-    ls -la $JAVA_HOME/bin/java 2>/dev/null || echo "Java binary not found in expected location"
-    echo ""
-    
-    # Check essential commands
-    echo "=== Essential Commands ==="
-    for cmd in ps nc wget curl kafka-topics.sh spark-submit mc; do
-      which $cmd 2>/dev/null || echo "$cmd not found"
-    done
-    echo ""
-    
-    # Check Spark installation
-    echo "=== Spark Installation ==="
-    spark-submit --version || echo "spark-submit not working properly"
-    echo ""
-    
-    # Check directory permissions
-    echo "=== Directory Permissions ==="
-    ls -la /opt/airflow/dags
-    ls -la /opt/airflow/logs
-    echo ""
-    
-    # Check network connectivity to services
-    echo "=== Network Connectivity ==="
-    for service in kafka:9092 cassandra:9042 prometheus:9090 minio:9000; do
-      host=$(echo $service | cut -d':' -f1)
-      port=$(echo $service | cut -d':' -f2)
-      echo -n "Checking $service: "
-      nc -z -v -w5 $host $port 2>&1 || echo "Failed to connect to $service"
-    done
-    echo ""
-    echo "=== Environment Verification Complete ==="
-    ''',
+    bash_command='/opt/airflow/verify_environment.sh',  # Use direct path
     env={'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64', 'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}'},
-    dag=dag
+    dag=dag,
 )
 
 # Define task dependencies
