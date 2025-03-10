@@ -63,6 +63,27 @@ RUN sed -i 's/\r$//' /opt/airflow/verify_environment.sh.orig && \
     chmod +x /opt/airflow/verify_environment.sh.orig && \
     chmod +x /entrypoint.sh
 
+# Create the script to set up Spark connection
+RUN echo '#!/bin/bash' > /opt/airflow/setup_spark_connection.sh && \
+    echo '# Creates the spark_default connection in Airflow' >> /opt/airflow/setup_spark_connection.sh && \
+    echo 'echo "Creating spark_default connection..."' >> /opt/airflow/setup_spark_connection.sh && \
+    echo 'airflow connections delete spark_default 2>/dev/null || true' >> /opt/airflow/setup_spark_connection.sh && \
+    echo 'airflow connections add spark_default \\' >> /opt/airflow/setup_spark_connection.sh && \
+    echo '    --conn-type spark \\' >> /opt/airflow/setup_spark_connection.sh && \
+    echo '    --conn-host local \\' >> /opt/airflow/setup_spark_connection.sh && \
+    echo '    --conn-port "" \\' >> /opt/airflow/setup_spark_connection.sh && \
+    echo '    --conn-extra '\''{\"spark-home\": \"/home/airflow/.local/lib/python3.7/site-packages/pyspark\", \"deploy-mode\": \"client\"}\''' >> /opt/airflow/setup_spark_connection.sh && \
+    echo 'echo "spark_default connection created successfully"' >> /opt/airflow/setup_spark_connection.sh && \
+    chmod +x /opt/airflow/setup_spark_connection.sh
+
+# Modify the entrypoint.sh to set up Spark connection on startup
+RUN sed -i '/^exec "\/\$\@"/i \
+# Add spark connection setup if needed\n\
+if [[ "$1" = "webserver" ]]; then\n\
+  echo "Setting up Spark connection on webserver startup..."\n\
+  nohup bash -c "sleep 30 && /opt/airflow/setup_spark_connection.sh" &\n\
+fi\n' /entrypoint.sh
+
 USER airflow
 
 # Configure pip for more reliable downloads
@@ -87,7 +108,8 @@ RUN echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> ~/.bashrc && \
     echo "export PATH=/home/airflow/.local/bin:\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
 
 # Create symbolic link for spark-submit to make it available in PATH
-RUN ln -sf $(python -c "import pyspark; print(pyspark.__path__[0])")/bin/spark-submit /home/airflow/.local/bin/spark-submit && \
+RUN mkdir -p /home/airflow/.local/bin && \
+    ln -sf $(python -c "import pyspark; print(pyspark.__path__[0])")/bin/spark-submit /home/airflow/.local/bin/spark-submit && \
     chmod +x /home/airflow/.local/bin/spark-submit
 
 # Make sure airflow is in the PATH
