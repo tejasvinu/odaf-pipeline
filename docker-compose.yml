@@ -77,6 +77,9 @@ services:
       - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,PLAINTEXT_HOST://kafka:29092
       - KAFKA_HEAP_OPTS=-Xmx256m -Xms256m  # Reduced memory allocation
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      # Adding this environment variable to force a specific cluster ID
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_DELETE_TOPIC_ENABLE=true
     volumes:
       - ./volumes/kafka_data:/bitnami/kafka
     depends_on:
@@ -89,6 +92,12 @@ services:
     restart: unless-stopped
     networks:
       - kafka-network
+    # This ensures we reset Kafka data if there's a cluster ID mismatch
+    command: >
+      bash -c "
+        rm -rf /bitnami/kafka/data/meta.properties || true;
+        /opt/bitnami/scripts/kafka/entrypoint.sh /opt/bitnami/scripts/kafka/run.sh
+      "
 
   # Kafka UI for management
   kafka-ui:
@@ -150,6 +159,7 @@ services:
   # Prometheus for monitoring
   prometheus:
     image: prom/prometheus
+    user: root  # Run as root to avoid permission issues
     ports:
       - "9091:9090"
     volumes:
@@ -252,7 +262,7 @@ services:
       - ./volumes/airflow_logs:/opt/airflow/logs
       - ./volumes/airflow_config:/opt/airflow/config
       - ./verify_environment.sh:/opt/airflow/verify_environment.sh  # Add direct mount for verification script
-    user: "${AIRFLOW_UID:-50000}:0"
+    user: "root"  # Run as root to avoid permission issues
     ports:
       - "8081:8080"
     restart: unless-stopped
@@ -272,7 +282,12 @@ services:
       airflow-network:
         aliases:
           - airflow
-    command: "webserver"
+    command: >
+      bash -c "
+        mkdir -p /opt/airflow/logs /opt/airflow/logs/scheduler /opt/airflow/logs/webserver /opt/airflow/logs/worker &&
+        chmod -R 777 /opt/airflow/logs &&
+        airflow webserver
+      "
     healthcheck:
       test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob || airflow jobs check --job-type WebServer"]
       interval: 30s
@@ -308,8 +323,13 @@ services:
       - ./volumes/airflow_logs:/opt/airflow/logs
       - ./volumes/airflow_config:/opt/airflow/config
       - ./verify_environment.sh:/opt/airflow/verify_environment.sh  # Add direct mount for verification script
-    user: "${AIRFLOW_UID:-50000}:0"
-    command: "scheduler"
+    user: "root"  # Run as root to avoid permission issues
+    command: >
+      bash -c "
+        mkdir -p /opt/airflow/logs /opt/airflow/logs/scheduler /opt/airflow/logs/webserver /opt/airflow/logs/worker &&
+        chmod -R 777 /opt/airflow/logs &&
+        airflow scheduler
+      "
     restart: unless-stopped
     networks:
       spark-network:
