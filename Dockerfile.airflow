@@ -70,6 +70,10 @@ RUN mkdir -p /opt/airflow/{logs,dags,plugins,config,downloads} && \
 
 USER airflow
 
+# Set environment variables to help Python find modules
+ENV PYTHONPATH=/opt/airflow:/home/airflow/.local/lib/python3.7/site-packages:${PYTHONPATH}
+ENV PATH=/home/airflow/.local/bin:${PATH}
+
 # Ensure the correct Airflow installation with better error handling and retry logic
 RUN pip install --upgrade pip && \
     pip config set global.timeout 1000 && \
@@ -77,7 +81,7 @@ RUN pip install --upgrade pip && \
     # Explicitly download the constraint file first to avoid network issues
     wget -O /tmp/constraints.txt "https://raw.githubusercontent.com/apache/airflow/constraints-2.5.0/constraints-3.7.txt" && \
     # Explicitly reinstall airflow to fix potential installation issues
-    pip install --no-cache-dir "apache-airflow==2.5.0" --constraint "/tmp/constraints.txt" && \
+    pip install --no-cache-dir --user "apache-airflow==2.5.0" --constraint "/tmp/constraints.txt" && \
     # Verify installation
     python -c "import airflow; print(f'Installed Airflow version: {airflow.__version__}')" && \
     # Clean up constraint file
@@ -87,19 +91,20 @@ RUN pip install --upgrade pip && \
 RUN airflow version
 
 # Install smaller packages first
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir --user \
     boto3 \
     kafka-python \
     requests
 
 # Install PySpark separately with a specific version
-RUN pip install --no-cache-dir pyspark==3.3.2
+RUN pip install --no-cache-dir --user pyspark==3.3.2
 
 # Install Airflow provider package
-RUN pip install --no-cache-dir apache-airflow-providers-apache-spark==4.1.0
+RUN pip install --no-cache-dir --user apache-airflow-providers-apache-spark==4.1.0
     
 # Add Java and Airflow paths for airflow user's shell
 RUN echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> ~/.bashrc && \
+    echo "export PYTHONPATH=/opt/airflow:/home/airflow/.local/lib/python3.7/site-packages:\${PYTHONPATH}" >> ~/.bashrc && \
     echo "export PATH=/home/airflow/.local/bin:\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
 
 # Make sure airflow is in the PATH

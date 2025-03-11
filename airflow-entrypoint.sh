@@ -10,7 +10,7 @@ echo "Python path: $(which python)"
 echo "Airflow home: $AIRFLOW_HOME"
 
 # Make sure the correct Python packages are in the PATH
-export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}/opt/airflow"
+export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}/opt/airflow:/home/airflow/.local/lib/python3.7/site-packages"
 export PATH="/home/airflow/.local/bin:$PATH"
 
 # Check verify_environment script
@@ -31,6 +31,10 @@ python -m pip install --upgrade pip
 # Debug check: where is airflow installed?
 which airflow || echo "Airflow command not found in PATH"
 python -m pip list | grep airflow || echo "Airflow not found in pip list"
+
+# Print Python path for debugging
+echo "Current Python sys.path:"
+python -c "import sys; print(sys.path)"
 
 # Check if airflow module is properly installed
 echo "Testing airflow module import..."
@@ -64,11 +68,22 @@ if ! which airflow > /dev/null 2>&1 || [ "$AIRFLOW_NEEDS_INSTALL" = true ]; then
     echo "ERROR: Airflow module still cannot be imported after reinstallation"
     echo "Python sys.path:"
     python -c "import sys; print(sys.path)"
-    echo "Continuing anyway, but expect problems..."
+    echo "Will attempt to install without constraints..."
+    pip install --no-cache-dir "apache-airflow==2.5.0" --user
+    if ! python -c "import airflow; print(f'Airflow {airflow.__version__} installed successfully')" 2>/dev/null; then
+      echo "ERROR: Airflow installation failed. Continuing anyway, but expect problems..."
+    else
+      echo "Airflow reinstallation successful!"
+    fi
   else
     echo "Airflow reinstallation successful!"
   fi
 fi
+
+# Create necessary folders with proper permissions
+mkdir -p "${AIRFLOW_HOME}/logs" "${AIRFLOW_HOME}/dags" "${AIRFLOW_HOME}/plugins" "${AIRFLOW_HOME}/config"
+chmod -R 777 "${AIRFLOW_HOME}/logs" "${AIRFLOW_HOME}/dags" "${AIRFLOW_HOME}/plugins" "${AIRFLOW_HOME}/config"
+chown -R airflow:root "${AIRFLOW_HOME}" || echo "Warning: Could not change ownership of AIRFLOW_HOME"
 
 # Initialize the database if needed
 if [[ "$1" == "webserver" ]]; then
