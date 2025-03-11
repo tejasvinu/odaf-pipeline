@@ -257,6 +257,7 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=metrics
+      - AIRFLOW_HOME=/opt/airflow
     volumes:
       - ./dags:/opt/airflow/dags
       - ./plugins:/opt/airflow/plugins
@@ -283,14 +284,10 @@ services:
       airflow-network:
         aliases:
           - airflow
-    command: >
-      bash -c "
-        mkdir -p /opt/airflow/logs /opt/airflow/logs/scheduler /opt/airflow/logs/webserver /opt/airflow/logs/worker &&
-        chmod -R 777 /opt/airflow/logs &&
-        airflow webserver
-      "
+    # Using the entrypoint script with "webserver" command
+    command: ["webserver"]
     healthcheck:
-      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob || airflow jobs check --job-type WebServer"]
+      test: ["CMD-SHELL", "airflow jobs check --job-type WebServer || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -318,6 +315,7 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=metrics
+      - AIRFLOW_HOME=/opt/airflow
     volumes:
       - ./dags:/opt/airflow/dags
       - ./plugins:/opt/airflow/plugins
@@ -325,12 +323,8 @@ services:
       - ./volumes/airflow_config:/opt/airflow/config
       - ./verify_environment.sh:/opt/airflow/verify_environment.sh  # Add direct mount for verification script
     user: "root"  # Run as root to avoid permission issues
-    command: >
-      bash -c "
-        mkdir -p /opt/airflow/logs /opt/airflow/logs/scheduler /opt/airflow/logs/webserver /opt/airflow/logs/worker &&
-        chmod -R 777 /opt/airflow/logs &&
-        airflow scheduler
-      "
+    # Using the entrypoint script with "scheduler" command
+    command: ["scheduler"]
     restart: unless-stopped
     networks:
       spark-network:
@@ -349,7 +343,7 @@ services:
         aliases:
           - airflow-scheduler
     healthcheck:
-      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob"]
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
