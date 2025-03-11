@@ -65,10 +65,12 @@ RUN sed -i 's/\r$//' /opt/airflow/verify_environment.sh.orig && \
 
 USER airflow
 
-# Configure pip for more reliable downloads
+# Ensure the correct Airflow installation
 RUN pip install --upgrade pip && \
     pip config set global.timeout 1000 && \
-    pip config set global.retries 10
+    pip config set global.retries 10 && \
+    # Explicitly reinstall airflow to fix potential installation issues
+    pip install --no-cache-dir "apache-airflow==2.5.0" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.5.0/constraints-3.7.txt"
 
 # Install smaller packages first
 RUN pip install --no-cache-dir \
