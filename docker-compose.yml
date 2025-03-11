@@ -177,6 +177,7 @@ services:
   # Grafana for data visualization
   grafana:
     image: grafana/grafana
+    user: root  # Add this line to run as root user
     ports:
       - "3001:3000"
     environment:
