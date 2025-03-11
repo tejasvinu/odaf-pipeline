@@ -70,10 +70,15 @@ RUN mkdir -p /root/.jupyter && \
     echo "c.ServerApp.allow_root = True" >> /root/.jupyter/jupyter_server_config.py
 
 # Create an example notebook if none exist
-RUN echo '{\n "cells": [\n  {\n   "cell_type": "markdown",\n   "metadata": {},\n   "source": [\n    "# Welcome to JupyterLab\\n",\n    "\\n",\n    "This is an example notebook."\n   ]\n  },\n  {\n   "cell_type": "code",\n   "execution_count": null,\n   "metadata": {},\n   "source": [\n    "import pyspark\\n",\n    "print(f\\"Spark version: {pyspark.__version__}\\")"\n   ]\n  }\n ],\n "metadata": {\n  "kernelspec": {\n   "display_name": "Python 3",\n   "language": "python",\n   "name": "python3"\n  },\n  "language_info": {\n   "codemirror_mode": {\n    "name": "ipython",\n    "version": 3\n   },\n   "file_extension": ".py",\n   "mimetype": "text/x-python",\n   "name": "python",\n   "nbconvert_exporter": "python",\n   "pygments_lexer": "ipython3",\n   "version": "3.10.0"\n  }\n },\n "nbformat": 4,\n "nbformat_minor": 4\n}' > /root/notebooks/example.ipynb
+RUN echo '{\n "cells": [\n  {\n   "cell_type": "markdown",\n   "metadata": {},\n   "source": [\n    "# Welcome to JupyterLab\\n",\n    "\\n",\n    "This is an example notebook."\n   ]\n  },\n  {\n   "cell_type": "code",\n   "execution_count": null,\n   "metadata": {},\n   "source": [\n    "import pyspark\\n",\n    "print(f\\"Spark version: {pyspark.__version__}\\")"\n   ]\n  }\n ],\n "metadata": {\n  "kernelspec": {\n   "display_name": "Python 3",\n   "language": "python",\n   "name": "python3"\n  },\n  "language_info": {\n   "codemirror_mode": {\n    "name": "ipython",\n    "version": 3\n   },\n   "file_extension": ".py",\n   "mimetype": "text/x-python",\n   "name": "python",\n   "nbconvert_exporter": "python",\n   "pygments_lexer": "ipython3",\n   "version": "3.10.0"\n  }\n },\n "nbformat": 4,\n "nbformat_minor": 4\n}' > /root/notebooks/example.ipynb && \
+    # Create a copy for new users directly at build time
+    cp /root/notebooks/example.ipynb /root/notebooks/welcome.ipynb
 
-# Fix permissions for the example notebook
-RUN chmod 644 /root/notebooks/example.ipynb
+# Fix permissions for notebooks at build time
+RUN chmod 644 /root/notebooks/*.ipynb && \
+    # Set up all directories at build time to avoid runtime setup
+    mkdir -p /root/notebooks /root/data /root/.jupyter && \
+    chmod -R 755 /root/notebooks /root/data /root/.jupyter
 
 # Set the working directory
 WORKDIR /root/notebooks
@@ -81,15 +86,15 @@ WORKDIR /root/notebooks
 # Expose ports for Jupyter
 EXPOSE 8888
 
-# Create startup script
+# Create optimized startup script (no installations, just launch)
 RUN echo '#!/bin/bash\n\
-echo "Initializing JupyterLab environment..."\n\
-mkdir -p /root/notebooks /root/data /root/.jupyter\n\
-chmod -R 755 /root/notebooks /root/data /root/.jupyter\n\
-if [ -z "$(ls -A /root/notebooks)" ]; then\n\
-  echo "Creating example notebook..."\n\
-  cp /root/notebooks/example.ipynb /root/notebooks/welcome.ipynb 2>/dev/null || echo "No example to copy."\n\
+echo "Starting JupyterLab..."\n\
+# Only handle the empty notebook directory case\n\
+if [ -z "$(ls -A /root/notebooks 2>/dev/null)" ]; then\n\
+  echo "Notebook directory is empty, copying example notebook..."\n\
+  cp /root/notebooks/example.ipynb /root/notebooks/welcome.ipynb 2>/dev/null || echo "Cannot copy example notebook."\n\
 fi\n\
+# Launch JupyterLab without any installation steps\n\
 exec jupyter lab --ServerApp.root_dir=/root/notebooks --ip=0.0.0.0 --no-browser --allow-root\n' > /usr/local/bin/start-jupyter.sh && \
 chmod +x /usr/local/bin/start-jupyter.sh
 
