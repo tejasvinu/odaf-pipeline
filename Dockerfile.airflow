@@ -94,9 +94,10 @@ RUN pip install --no-cache-dir --user \
     kafka-python \
     requests \
     pyspark==3.3.2 \
-    apache-airflow-providers-apache-spark==4.1.0 && \
+    apache-airflow-providers-apache-spark==4.1.0 \
+    psycopg2-binary && \
     # Verify all packages are properly installed
-    pip list | grep -E "boto3|kafka-python|requests|pyspark|apache-airflow-providers-apache-spark" && \
+    pip list | grep -E "boto3|kafka-python|requests|pyspark|apache-airflow-providers-apache-spark|psycopg2-binary" && \
     # Initialize the airflow database during build to avoid first-run delays
     mkdir -p ${AIRFLOW_HOME}/logs ${AIRFLOW_HOME}/dags && \
     airflow version
