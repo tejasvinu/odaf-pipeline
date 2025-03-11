@@ -63,14 +63,25 @@ RUN sed -i 's/\r$//' /opt/airflow/verify_environment.sh.orig && \
     chmod +x /opt/airflow/verify_environment.sh.orig && \
     chmod +x /entrypoint.sh
 
+# Explicitly set directory permissions
+RUN mkdir -p /opt/airflow/{logs,dags,plugins,config,downloads} && \
+    chmod -R 777 /opt/airflow/logs /opt/airflow/dags /opt/airflow/plugins /opt/airflow/config /opt/airflow/downloads && \
+    touch /opt/airflow/.airflowignore && chmod 644 /opt/airflow/.airflowignore
+
 USER airflow
 
-# Ensure the correct Airflow installation
+# Ensure the correct Airflow installation with better error handling and retry logic
 RUN pip install --upgrade pip && \
     pip config set global.timeout 1000 && \
     pip config set global.retries 10 && \
+    # Explicitly download the constraint file first to avoid network issues
+    wget -O /tmp/constraints.txt "https://raw.githubusercontent.com/apache/airflow/constraints-2.5.0/constraints-3.7.txt" && \
     # Explicitly reinstall airflow to fix potential installation issues
-    pip install --no-cache-dir "apache-airflow==2.5.0" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.5.0/constraints-3.7.txt"
+    pip install --no-cache-dir "apache-airflow==2.5.0" --constraint "/tmp/constraints.txt" && \
+    # Verify installation
+    python -c "import airflow; print(f'Installed Airflow version: {airflow.__version__}')" && \
+    # Clean up constraint file
+    rm -f /tmp/constraints.txt
 
 # Verify Airflow installation
 RUN airflow version

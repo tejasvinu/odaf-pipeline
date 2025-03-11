@@ -24,16 +24,50 @@ else
   echo "verify_environment.sh not found!"
 fi
 
+# First upgrade pip to avoid version issues
+echo "Upgrading pip..."
+python -m pip install --upgrade pip
+
 # Debug check: where is airflow installed?
 which airflow || echo "Airflow command not found in PATH"
 python -m pip list | grep airflow || echo "Airflow not found in pip list"
 
-# If airflow command not found, try to reinstall
-if ! which airflow > /dev/null 2>&1; then
-  echo "Airflow not found, attempting reinstallation..."
-  pip install --no-cache-dir "apache-airflow==2.5.0" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.5.0/constraints-3.7.txt"
+# Check if airflow module is properly installed
+echo "Testing airflow module import..."
+if ! python -c "import airflow; print(f'Airflow {airflow.__version__} found')" 2>/dev/null; then
+  echo "Airflow module cannot be imported, will reinstall"
+  AIRFLOW_NEEDS_INSTALL=true
+else
+  echo "Airflow module can be imported"
+  AIRFLOW_NEEDS_INSTALL=false
+fi
+
+# If airflow command not found or module import failed, try to reinstall
+if ! which airflow > /dev/null 2>&1 || [ "$AIRFLOW_NEEDS_INSTALL" = true ]; then
+  echo "Airflow installation issues detected, performing full reinstallation..."
+  
+  # Clean previous installation artifacts
+  echo "Cleaning previous installation..."
+  pip uninstall -y apache-airflow || echo "No existing airflow package to remove"
+  
+  # Ensure we have the right dependencies
+  echo "Installing airflow with pip..."
+  pip install --no-cache-dir "apache-airflow==2.5.0" \
+    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.5.0/constraints-3.7.txt"
+  
+  # Verify installation was successful
   echo "PATH after installation: $PATH"
-  which airflow || echo "Airflow still not found in PATH after installation"
+  which airflow || echo "ERROR: Airflow still not found in PATH after installation"
+  
+  # Verify module can be imported
+  if ! python -c "import airflow; print(f'Airflow {airflow.__version__} installed successfully')" 2>/dev/null; then
+    echo "ERROR: Airflow module still cannot be imported after reinstallation"
+    echo "Python sys.path:"
+    python -c "import sys; print(sys.path)"
+    echo "Continuing anyway, but expect problems..."
+  else
+    echo "Airflow reinstallation successful!"
+  fi
 fi
 
 # Initialize the database if needed
