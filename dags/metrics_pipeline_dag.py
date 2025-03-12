@@ -89,6 +89,7 @@ create_kafka_topics = BashOperator(
 # Initialize Cassandra schema with node tracking
 init_schema = SparkSubmitOperator(
     task_id='init_schema',
+    conn_id='spark_default',  # Using explicit conn_id instead of None
     spark_binary="/home/airflow/.local/bin/spark-submit",
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conf={
@@ -96,45 +97,46 @@ init_schema = SparkSubmitOperator(
         'spark.executor.memory': '1g',
         'spark.cassandra.connection.host': 'cassandra',
         'spark.cassandra.connection.port': '9042',
-        'spark.master': 'local[*]',
     },
+    java_home='/usr/lib/jvm/java-11-openjdk-amd64',
+    master='local[*]',  # Explicitly set master here instead of in conf
     application_args=['--init-schema'],
     name='init-schema',
     verbose=True,
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
-        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:${PATH}',
+        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/bin:/usr/bin:/usr/local/bin:${PATH}',
     },
     dag=dag,
-    conn_id=None,
 )
 
 # Start the Prometheus to Kafka connector with node identification
 start_prometheus_kafka = SparkSubmitOperator(
     task_id='start_prometheus_kafka',
+    conn_id='spark_default',  # Using explicit conn_id instead of None
     spark_binary="/home/airflow/.local/bin/spark-submit",
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'prometheus_to_kafka.py'),
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
-        'spark.master': 'local[*]',
     },
+    master='local[*]',  # Explicitly set master here instead of in conf
     name='prometheus-kafka',
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
-        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}',
+        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/bin:/usr/bin:/usr/local/bin:${PATH}',
         'PROMETHEUS_URL': 'http://prometheus:9090',
         'KAFKA_BOOTSTRAP_SERVERS': 'kafka:29092',
         'INCLUDE_NODE_METADATA': 'true',
         'SCRAPE_INTERVAL': '60'
     },
-    conn_id=None,
     dag=dag,
 )
 
 # Process metrics and store in Cassandra with node tracking
 process_metrics = SparkSubmitOperator(
     task_id='process_metrics',
+    conn_id='spark_default',  # Using explicit conn_id instead of None
     spark_binary="/home/airflow/.local/bin/spark-submit",
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conf={
@@ -143,16 +145,15 @@ process_metrics = SparkSubmitOperator(
         'spark.cores.max': '2',
         'spark.cassandra.connection.host': 'cassandra',
         'spark.cassandra.connection.port': '9042',
-        'spark.master': 'local[*]',
     },
+    master='local[*]',  # Explicitly set master here instead of in conf
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
-        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}',
+        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/bin:/usr/bin:/usr/local/bin:${PATH}',
         'KAFKA_BOOTSTRAP_SERVERS': 'kafka:29092',
         'CASSANDRA_HOST': 'cassandra'
     },
     name='metrics-processor',
-    conn_id=None,
     dag=dag,
 )
 
@@ -177,11 +178,11 @@ monitor_pipeline = BashOperator(
 
 verify_env = BashOperator(
     task_id='verify_environment',
-    bash_command='/opt/airflow/verify_environment.sh',  # Use direct path instead of template
-    env={'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64', 'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}'},
+    bash_command='/opt/airflow/verify_environment.sh',
+    env={'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64', 'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/bin:/usr/bin:/usr/local/bin:${PATH}'},
     dag=dag
 )
 
-# Define task dependencies - removed check_tools from the chain
+# Define task dependencies
 setup_java >> [check_kafka, check_cassandra, check_prometheus] >> create_kafka_topics >> init_schema
 init_schema >> start_prometheus_kafka >> process_metrics >> monitor_pipeline
