@@ -54,11 +54,11 @@ setup_java = BashOperator(
 # Add check for Spark and required tools
 check_tools = BashOperator(
     task_id='check_tools',
-    bash_command='''
+    bash_command='''#!/bin/sh
     echo "Checking required tools..."
     
     # Check spark-submit
-    if ! command -v spark-submit &> /dev/null; then
+    if ! command -v spark-submit > /dev/null 2>&1; then
         echo "ERROR: spark-submit not found in PATH"
         exit 1
     fi
