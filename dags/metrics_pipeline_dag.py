@@ -94,19 +94,21 @@ create_kafka_topics = BashOperator(
 # Initialize Cassandra schema and MinIO bucket - fixed SparkSubmitOperator config
 init_storage = SparkSubmitOperator(
     task_id='init_storage',
+    # Add this parameter to specify where spark-submit is located
+    spark_binary="/usr/local/bin/spark-submit",  # Adjust this path if needed
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conf={
         'spark.driver.memory': '1g',
         'spark.executor.memory': '1g',
         'spark.jars.packages': 'org.apache.hadoop:hadoop-aws:3.3.2',
-        'spark.master': 'local[*]',  # Use only one master configuration
+        'spark.master': 'local[*]',
     },
     application_args=['--init-only'],
     name='metrics-init',
     verbose=True,
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
-        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:${PATH}',
+        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:${PATH}',
         'MINIO_ENDPOINT': 'http://minio:9000',
         'MINIO_ACCESS_KEY': 'minioadmin',
         'MINIO_SECRET_KEY': 'minioadmin',
