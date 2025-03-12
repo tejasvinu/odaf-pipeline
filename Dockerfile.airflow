@@ -64,14 +64,12 @@ RUN sed -i 's/\r$//' /opt/airflow/verify_environment.sh && \
     chmod +x /opt/airflow/fix_spark_issues.sh && \
     chmod +x /entrypoint.sh
 
-# Create proper symlinks for Spark binaries to ensure compatibility with Airflow
+# Create proper spark-submit binary for Airflow by writing a wrapper script directly with an allowed name
 RUN mkdir -p /usr/local/bin && \
-    echo '#!/bin/bash' > /usr/local/bin/spark-submit-wrapper && \
-    echo '# Wrapper script for spark-submit to ensure proper shell usage' >> /usr/local/bin/spark-submit-wrapper && \
-    echo 'exec /home/airflow/.local/bin/spark-submit "$@"' >> /usr/local/bin/spark-submit-wrapper && \
-    chmod +x /usr/local/bin/spark-submit-wrapper && \
-    # Create standard spark-submit symlinks that Airflow expects
-    ln -sf /usr/local/bin/spark-submit-wrapper /usr/local/bin/spark-submit
+    echo '#!/bin/bash' > /usr/local/bin/spark-submit && \
+    echo '# Wrapper script for spark-submit to ensure proper shell usage' >> /usr/local/bin/spark-submit && \
+    echo 'exec /home/airflow/.local/bin/spark-submit "$@"' >> /usr/local/bin/spark-submit && \
+    chmod +x /usr/local/bin/spark-submit
 
 # Explicitly set directory permissions
 RUN mkdir -p /opt/airflow/{logs,dags,plugins,config,downloads} && \
