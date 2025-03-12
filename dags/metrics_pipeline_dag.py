@@ -55,21 +55,21 @@ setup_java = BashOperator(
 check_tools = BashOperator(
     task_id='check_tools',
     bash_command='''echo "Checking required tools..."
-    
+
     # Check spark-submit
     if ! command -v spark-submit > /dev/null 2>&1; then
         echo "ERROR: spark-submit not found in PATH"
         exit 1
     fi
     spark-submit --version || exit 1
-    
+
     # Check Python and required packages
     python3 -V || exit 1
     pip list | grep -E "pyspark|kafka-python|cassandra-driver|minio" || echo "Warning: Some Python packages may be missing"
-    
+
     # Check Hadoop AWS jars
     ls $SPARK_HOME/jars/hadoop-aws* || echo "Warning: Hadoop AWS jars not found"
-    
+
     echo "All tool checks completed"
     ''',
     env={
@@ -78,8 +78,8 @@ check_tools = BashOperator(
         'SPARK_HOME': '/opt/spark'
     },
     dag=dag,
-    bash_executable='/bin/sh',  # Explicitly use sh instead of bash
 )
+
 # Health checks for services using netcat (available in both busybox and full netcat)
 check_kafka = BashOperator(
     task_id='check_kafka',
