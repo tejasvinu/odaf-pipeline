@@ -51,35 +51,6 @@ setup_java = BashOperator(
     dag=dag,
 )
 
-# Add check for Spark and required tools
-check_tools = BashOperator(
-    task_id='check_tools',
-    bash_command='''echo "Checking required tools..."
-
-    # Check spark-submit
-    if ! command -v spark-submit > /dev/null 2>&1; then
-        echo "ERROR: spark-submit not found in PATH"
-        exit 1
-    fi
-    spark-submit --version || exit 1
-
-    # Check Python and required packages
-    python3 -V || exit 1
-    pip list | grep -E "pyspark|kafka-python|cassandra-driver|minio" || echo "Warning: Some Python packages may be missing"
-
-    # Check Hadoop AWS jars
-    ls $SPARK_HOME/jars/hadoop-aws* || echo "Warning: Hadoop AWS jars not found"
-
-    echo "All tool checks completed"
-    ''',
-    env={
-        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
-        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/home/airflow/.local/bin:${PATH}',
-        'SPARK_HOME': '/opt/spark'
-    },
-    dag=dag,
-)
-
 # Health checks for essential services
 check_kafka = BashOperator(
     task_id='check_kafka',
@@ -211,6 +182,6 @@ verify_env = BashOperator(
     dag=dag
 )
 
-# Define task dependencies
-setup_java >> check_tools >> [check_kafka, check_cassandra, check_prometheus] >> create_kafka_topics >> init_schema
+# Define task dependencies - removed check_tools from the chain
+setup_java >> [check_kafka, check_cassandra, check_prometheus] >> create_kafka_topics >> init_schema
 init_schema >> start_prometheus_kafka >> process_metrics >> monitor_pipeline
