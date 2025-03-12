@@ -95,7 +95,7 @@ create_kafka_topics = BashOperator(
 init_storage = SparkSubmitOperator(
     task_id='init_storage',
     # Add this parameter to specify where spark-submit is located
-    spark_binary="/usr/local/bin/spark-submit",  # Adjust this path if needed
+    spark_binary="/home/airflow/.local/bin/spark-submit",  # Updated path
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conf={
         'spark.driver.memory': '1g',
@@ -121,6 +121,7 @@ init_storage = SparkSubmitOperator(
 # Start the Prometheus to Kafka connector - fixed config
 start_prometheus_kafka = SparkSubmitOperator(
     task_id='start_prometheus_kafka',
+    spark_binary="/home/airflow/.local/bin/spark-submit",  # Add this line
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'prometheus_to_kafka.py'),
     conf={
         'spark.driver.memory': '1g',
@@ -141,6 +142,7 @@ start_prometheus_kafka = SparkSubmitOperator(
 # Start the metrics processor - fixed config
 start_metrics_processor = SparkSubmitOperator(
     task_id='start_metrics_processor',
+    spark_binary="/home/airflow/.local/bin/spark-submit",  # Add this line
     application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
     conf={
         'spark.driver.memory': '1g',
