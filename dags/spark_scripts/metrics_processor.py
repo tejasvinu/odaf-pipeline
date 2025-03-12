@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 import sys
-from pyspark.sql.functions import from_json, col, to_json, struct
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+from pyspark.sql.functions import from_json, col, to_json, struct, expr
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType, MapType, TimestampType
 import os
 
 # MinIO configuration
@@ -13,7 +13,7 @@ MINIO_BUCKET = os.environ.get('MINIO_BUCKET', 'metrics')
 def create_spark_session():
     """Create and return a Spark Session configured for streaming."""
     return (SparkSession.builder
-            .appName("Simplified Metrics Processor")
+            .appName("Node-Aware Metrics Processor")
             .config("spark.jars.packages", 
                    "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,"
                    "com.datastax.spark:spark-cassandra-connector_2.12:3.3.0,"
@@ -28,7 +28,7 @@ def create_spark_session():
             .getOrCreate())
 
 def setup_cassandra_schema(spark):
-    """Create keyspace and tables in Cassandra if they don't exist."""
+    """Create keyspace and tables in Cassandra for node-aware metrics."""
     try:
         # Create keyspace
         spark.sql("""
@@ -36,23 +36,50 @@ def setup_cassandra_schema(spark):
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
         """)
         
-        # Create tables with proper partitioning
-        tables = ['ipmi_metrics', 'node_metrics', 'gpu_metrics', 'slurm_metrics']
-        for table in tables:
-            spark.sql(f"""
-                CREATE TABLE IF NOT EXISTS metrics.{table} (
-                    name STRING,
-                    value DOUBLE,
-                    timestamp STRING,
-                    PRIMARY KEY (name, timestamp)
+        # Create tables with node identification
+        tables = {
+            'node_metrics': """
+                CREATE TABLE IF NOT EXISTS metrics.node_metrics (
+                    node_name text,
+                    instance text,
+                    job text,
+                    metric_name text,
+                    value double,
+                    timestamp timestamp,
+                    labels map<text, text>,
+                    PRIMARY KEY ((node_name), timestamp, metric_name)
                 )
-                USING cassandra
-                OPTIONS (
-                    table "{table}",
-                    keyspace "metrics"
+            """,
+            'node_resource_usage': """
+                CREATE TABLE IF NOT EXISTS metrics.node_resource_usage (
+                    node_name text,
+                    instance text,
+                    job text,
+                    metric_name text,
+                    value double,
+                    timestamp timestamp,
+                    labels map<text, text>,
+                    PRIMARY KEY ((node_name), timestamp, metric_name)
                 )
-            """)
-        print("Successfully created Cassandra schema")
+            """,
+            'node_health_status': """
+                CREATE TABLE IF NOT EXISTS metrics.node_health_status (
+                    node_name text,
+                    instance text,
+                    job text,
+                    metric_name text,
+                    value double,
+                    timestamp timestamp,
+                    labels map<text, text>,
+                    PRIMARY KEY ((node_name), timestamp, metric_name)
+                )
+            """
+        }
+        
+        for table_name, create_stmt in tables.items():
+            spark.sql(create_stmt)
+            
+        print("Successfully created Cassandra schema with node tracking")
         return True
     except Exception as e:
         print(f"Error creating Cassandra schema: {e}")
@@ -102,17 +129,28 @@ def foreach_batch_function(df, epoch_id, topic):
         print(f"Error in foreach_batch_function: {e}")
         raise
 
+def get_metric_schema():
+    """Define the schema for incoming metrics with node information."""
+    return StructType([
+        StructField("name", StringType(), True),
+        StructField("value", DoubleType(), True),
+        StructField("timestamp", StringType(), True),
+        StructField("node", StructType([
+            StructField("instance", StringType(), True),
+            StructField("job", StringType(), True),
+            StructField("node_name", StringType(), True),
+            StructField("machine", StringType(), True),
+            StructField("os", StringType(), True),
+            StructField("system", StringType(), True)
+        ]), True),
+        StructField("group", StringType(), True),
+        StructField("labels", MapType(StringType(), StringType()), True)
+    ])
+
 def process_metrics_stream(spark, topic, table_name):
-    """Process metrics from a Kafka topic and write to both Cassandra and MinIO."""
+    """Process metrics from Kafka and store in Cassandra with node tracking."""
     try:
-        # Define schema for the simplified metrics
-        metric_schema = StructType([
-            StructField("name", StringType(), True),
-            StructField("value", DoubleType(), True),
-            StructField("timestamp", StringType(), True)
-        ])
-        
-        # Read from Kafka with error handling
+        # Read from Kafka
         stream_df = (spark
                     .readStream
                     .format("kafka")
@@ -121,16 +159,33 @@ def process_metrics_stream(spark, topic, table_name):
                     .option("startingOffsets", "earliest")
                     .option("failOnDataLoss", "false")
                     .load())
-        
-        # Parse JSON and select fields
+
+        # Parse JSON with node information
+        metric_schema = get_metric_schema()
         parsed_df = (stream_df
                     .selectExpr("CAST(value AS STRING) as json")
                     .select(from_json("json", metric_schema).alias("data"))
                     .select("data.*"))
         
-        # Write stream with foreachBatch to handle both MinIO and Cassandra
-        query = (parsed_df.writeStream
-                .foreachBatch(lambda df, epoch_id: foreach_batch_function(df, epoch_id, topic))
+        # Transform for Cassandra storage
+        processed_df = (parsed_df
+                       .select(
+                           col("node.node_name").alias("node_name"),
+                           col("node.instance").alias("instance"),
+                           col("node.job").alias("job"),
+                           col("name").alias("metric_name"),
+                           col("value"),
+                           expr("cast(timestamp as timestamp)").alias("timestamp"),
+                           col("labels")
+                       ))
+        
+        # Write to Cassandra
+        query = (processed_df.writeStream
+                .foreachBatch(lambda df, epoch_id: df.write
+                            .format("org.apache.spark.sql.cassandra")
+                            .options(table=table_name, keyspace="metrics")
+                            .mode("append")
+                            .save())
                 .option("checkpointLocation", f"/tmp/checkpoints/{topic}")
                 .start())
         
@@ -140,7 +195,7 @@ def process_metrics_stream(spark, topic, table_name):
         raise
 
 def main():
-    """Main function to start the Spark Streaming jobs."""
+    """Main function to start the Spark Streaming jobs with node tracking."""
     spark = create_spark_session()
     print(f"Spark version: {spark.version}")
     
@@ -153,13 +208,12 @@ def main():
     setup_cassandra_schema(spark)
     setup_minio(spark)
     
-    # Process each metric type
+    # Process each topic
     queries = []
     metric_configs = [
-        ("ipmi-metrics", "ipmi_metrics"),
         ("node-metrics", "node_metrics"),
-        ("gpu-metrics", "gpu_metrics"),
-        ("slurm-metrics", "slurm_metrics")
+        ("node-resource-usage", "node_resource_usage"),
+        ("node-health-status", "node_health_status")
     ]
     
     try:
@@ -173,7 +227,6 @@ def main():
             query.awaitTermination()
     except Exception as e:
         print(f"Error in main processing loop: {e}")
-        # Clean up any running queries
         for query in queries:
             if query and query.isActive:
                 query.stop()

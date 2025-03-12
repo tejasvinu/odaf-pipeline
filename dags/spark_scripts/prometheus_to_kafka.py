@@ -24,27 +24,25 @@ retry_strategy = Retry(
 session.mount("http://", HTTPAdapter(max_retries=retry_strategy))
 session.mount("https://", HTTPAdapter(max_retries=retry_strategy))
 
-# Mapping of exporters to their topics and queries
-EXPORTERS = [
-    {
-        'name': 'ipmi',
-        'query': 'ipmi_*',
-        'topic': 'ipmi-metrics'
-    },
+# Define metrics mapping with node identification
+METRIC_GROUPS = [
     {
         'name': 'node',
-        'query': 'node_*',
-        'topic': 'node-metrics'
+        'query': '{__name__=~"node_.*", instance=~".+"}',  # Explicitly request instance label
+        'topic': 'node-metrics',
+        'required_labels': ['instance', 'job']
     },
     {
-        'name': 'dcgm',
-        'query': 'DCGM_*',
-        'topic': 'gpu-metrics'
+        'name': 'resource',
+        'query': '{__name__=~"node_(cpu|memory|disk|filesystem|network).*", instance=~".+"}',
+        'topic': 'node-resource-usage',
+        'required_labels': ['instance', 'job']
     },
     {
-        'name': 'slurm',
-        'query': 'slurm_*',
-        'topic': 'slurm-metrics'
+        'name': 'health',
+        'query': '{__name__=~"up|node_(uname_info|time|load1|memory_MemAvailable_bytes)", instance=~".+"}',
+        'topic': 'node-health-status',
+        'required_labels': ['instance', 'job']
     }
 ]
 
@@ -72,65 +70,87 @@ def fetch_metrics_from_prometheus(query):
         print(f"Error fetching metrics: {e}")
         return None
 
-def simplify_metric(metric_data):
-    """Convert Prometheus metric to simplified format with just name and value."""
+def extract_node_info(metric_data):
+    """Extract node identification information from metric labels."""
+    labels = metric_data.get('metric', {})
+    node_info = {
+        'instance': labels.get('instance', 'unknown'),
+        'job': labels.get('job', 'unknown'),
+        'node_name': labels.get('nodename', labels.get('instance', 'unknown').split(':')[0])
+    }
+    
+    # Add additional node metadata if available
+    if 'node_uname_info' in str(labels.get('__name__', '')):
+        node_info.update({
+            'machine': labels.get('machine', ''),
+            'os': labels.get('operating_system', ''),
+            'system': labels.get('system', '')
+        })
+    
+    return node_info
+
+def format_metric(metric_data, group_name):
+    """Format metric with node identification and metadata."""
     try:
-        metric_name = next((v for k, v in metric_data['metric'].items() if k == '__name__'), None)
-        if not metric_name:
-            # If no __name__ found, create name from labels
-            labels = [f"{k}={v}" for k, v in metric_data['metric'].items() if k != '__name__']
-            metric_name = '_'.join(labels)
+        metric_name = metric_data['metric'].get('__name__', 'unnamed_metric')
+        node_info = extract_node_info(metric_data)
+        timestamp = datetime.utcnow().isoformat()
         
         return {
             'name': metric_name,
             'value': float(metric_data['value'][1]) if len(metric_data['value']) > 1 else None,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': timestamp,
+            'node': node_info,
+            'group': group_name,
+            'labels': {k: v for k, v in metric_data['metric'].items() 
+                      if k not in ['__name__', 'instance', 'job']}  # Additional labels
         }
     except (KeyError, IndexError, ValueError) as e:
-        print(f"Error simplifying metric: {e}")
+        print(f"Error formatting metric: {e}")
         return None
 
 def send_to_kafka(producer, topic, data):
     """Send data to Kafka with error handling."""
     try:
         future = producer.send(topic, data)
-        future.get(timeout=10)  # Wait for the send to complete
+        future.get(timeout=10)  # Wait for send to complete
         return True
     except KafkaError as e:
         print(f"Error sending to Kafka topic {topic}: {e}")
         return False
 
 def main():
-    """Main function to periodically fetch metrics and send to Kafka."""
-    print(f"Starting Prometheus to Kafka connector")
+    """Main function to collect and forward metrics with node identification."""
+    print(f"Starting Prometheus to Kafka connector with node tracking")
     print(f"Prometheus URL: {PROMETHEUS_URL}")
     print(f"Kafka Bootstrap Servers: {KAFKA_BOOTSTRAP_SERVERS}")
     
     producer = create_kafka_producer()
     
     while True:
-        for exporter in EXPORTERS:
-            exporter_name = exporter['name']
-            query = exporter['query']
-            topic = exporter['topic']
+        for group in METRIC_GROUPS:
+            print(f"Fetching {group['name']} metrics...")
+            result = fetch_metrics_from_prometheus(group['query'])
             
-            print(f"Fetching {exporter_name} metrics with query: {query}")
-            result = fetch_metrics_from_prometheus(query)
-            
-            if result and result.get('status') == 'success' and result.get('data', {}).get('result'):
-                metrics_data = result['data']['result']
+            if result and result.get('status') == 'success':
+                metrics = result.get('data', {}).get('result', [])
                 success_count = 0
                 
-                for metric in metrics_data:
-                    simple_metric = simplify_metric(metric)
-                    if simple_metric:
-                        if send_to_kafka(producer, topic, simple_metric):
-                            success_count += 1
+                for metric in metrics:
+                    # Verify required labels are present
+                    labels = metric.get('metric', {})
+                    if all(label in labels for label in group['required_labels']):
+                        formatted_metric = format_metric(metric, group['name'])
+                        if formatted_metric:
+                            if send_to_kafka(producer, group['topic'], formatted_metric):
+                                success_count += 1
+                    else:
+                        print(f"Skipping metric missing required labels: {labels}")
                 
                 producer.flush()
-                print(f"Successfully published {success_count}/{len(metrics_data)} {exporter_name} metrics to topic '{topic}'")
+                print(f"Published {success_count}/{len(metrics)} {group['name']} metrics to {group['topic']}")
             else:
-                print(f"No metrics found for {exporter_name} or query failed")
+                print(f"No metrics found for {group['name']} or query failed")
         
         print(f"Sleeping for {SCRAPE_INTERVAL} seconds...")
         time.sleep(SCRAPE_INTERVAL)
