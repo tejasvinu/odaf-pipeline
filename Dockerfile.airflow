@@ -1,6 +1,8 @@
 FROM apache/airflow:2.5.0
 
 USER root
+
+# Install required packages and bash explicitly for spark-submit
 RUN apt-get update && \
     apt-get install -y \
     netcat-traditional \
@@ -8,7 +10,8 @@ RUN apt-get update && \
     wget \
     kafkacat \
     procps \
-    curl && \
+    curl \
+    bash && \
     wget https://dl.min.io/client/mc/release/linux-amd64/mc && \
     chmod +x mc && \
     mv mc /usr/local/bin/ && \
@@ -42,26 +45,37 @@ RUN ln -sf /usr/lib/jvm/java-11-openjdk-amd64 /usr/lib/jvm/default-java && \
     echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> /home/airflow/.bashrc && \
     echo "export PATH=$JAVA_HOME/bin:$PATH" >> /home/airflow/.bashrc
 
-# Copy the verification script and create the entrypoint
-COPY verify_environment.sh /opt/airflow/verify_environment.sh.orig
+# Copy and prepare scripts for environment verification and setup
+COPY verify_environment.sh /opt/airflow/verify_environment.sh
+COPY fix_bash_issue.sh /opt/airflow/fix_bash_issue.sh
+COPY fix_airflow_connections.sh /opt/airflow/fix_airflow_connections.sh
+COPY fix_spark_issues.sh /opt/airflow/fix_spark_issues.sh
 COPY airflow-entrypoint.sh /entrypoint.sh
 
-# Create a safer wrapper script for verify_environment.sh
-RUN echo '#!/bin/bash' > /usr/local/bin/verify_env && \
-    echo 'set +e  # Do not exit on error' >> /usr/local/bin/verify_env && \
-    echo 'if [ -f /opt/airflow/verify_environment.sh ]; then' >> /usr/local/bin/verify_env && \
-    echo '  bash /opt/airflow/verify_environment.sh "$@" || echo "Verification script completed with non-zero exit code"' >> /usr/local/bin/verify_env && \
-    echo 'else' >> /usr/local/bin/verify_env && \
-    echo '  echo "Using built-in verification script"' >> /usr/local/bin/verify_env && \
-    echo '  bash /opt/airflow/verify_environment.sh.orig "$@" || echo "Verification script completed with non-zero exit code"' >> /usr/local/bin/verify_env && \
-    echo 'fi' >> /usr/local/bin/verify_env && \
-    chmod +x /usr/local/bin/verify_env
-
-# Convert line endings and make scripts executable
-RUN sed -i 's/\r$//' /opt/airflow/verify_environment.sh.orig && \
+# Clean up script files and ensure they're executable
+RUN sed -i 's/\r$//' /opt/airflow/verify_environment.sh && \
+    sed -i 's/\r$//' /opt/airflow/fix_bash_issue.sh && \
+    sed -i 's/\r$//' /opt/airflow/fix_airflow_connections.sh && \
+    sed -i 's/\r$//' /opt/airflow/fix_spark_issues.sh && \
     sed -i 's/\r$//' /entrypoint.sh && \
-    chmod +x /opt/airflow/verify_environment.sh.orig && \
+    chmod +x /opt/airflow/verify_environment.sh && \
+    chmod +x /opt/airflow/fix_bash_issue.sh && \
+    chmod +x /opt/airflow/fix_airflow_connections.sh && \
+    chmod +x /opt/airflow/fix_spark_issues.sh && \
     chmod +x /entrypoint.sh
+
+# Create a Spark submit wrapper to ensure proper execution
+RUN mkdir -p /usr/local/bin && \
+    echo '#!/bin/sh' > /usr/local/bin/spark-submit-wrapper && \
+    echo '# Wrapper script for spark-submit to ensure proper shell usage' >> /usr/local/bin/spark-submit-wrapper && \
+    echo 'SPARK_SUBMIT=$(which spark-submit 2>/dev/null || echo "not-found")' >> /usr/local/bin/spark-submit-wrapper && \
+    echo 'if [ "$SPARK_SUBMIT" = "not-found" ]; then' >> /usr/local/bin/spark-submit-wrapper && \
+    echo '  echo "ERROR: spark-submit not found in PATH"' >> /usr/local/bin/spark-submit-wrapper && \
+    echo '  exit 1' >> /usr/local/bin/spark-submit-wrapper && \
+    echo 'fi' >> /usr/local/bin/spark-submit-wrapper && \
+    echo 'exec $SPARK_SUBMIT "$@"' >> /usr/local/bin/spark-submit-wrapper && \
+    chmod +x /usr/local/bin/spark-submit-wrapper && \
+    ln -sf /usr/local/bin/spark-submit-wrapper /usr/local/bin/spark-submit
 
 # Explicitly set directory permissions
 RUN mkdir -p /opt/airflow/{logs,dags,plugins,config,downloads} && \
@@ -106,6 +120,9 @@ RUN pip install --no-cache-dir --user \
 RUN echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> ~/.bashrc && \
     echo "export PYTHONPATH=/opt/airflow:/home/airflow/.local/lib/python3.7/site-packages:\${PYTHONPATH}" >> ~/.bashrc && \
     echo "export PATH=/home/airflow/.local/bin:\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
+
+# Set up Airflow connections during image build
+ENV AIRFLOW_CONN_SPARK_DEFAULT="spark://local[*]?spark-home=/home/airflow/.local/&spark-binary=/usr/local/bin/spark-submit-wrapper"
 
 # Make sure airflow is in the PATH
 ENV PATH="/home/airflow/.local/bin:${PATH}"

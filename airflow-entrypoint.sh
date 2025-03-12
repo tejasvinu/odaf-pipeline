@@ -16,6 +16,10 @@ mkdir -p "${AIRFLOW_HOME}/logs" "${AIRFLOW_HOME}/dags" "${AIRFLOW_HOME}/plugins"
 chmod -R 777 "${AIRFLOW_HOME}/logs" "${AIRFLOW_HOME}/dags" "${AIRFLOW_HOME}/plugins" "${AIRFLOW_HOME}/config" || true
 chown -R airflow:root "${AIRFLOW_HOME}" || true
 
+# Verify and fix bash and spark environment
+echo "Verifying and fixing bash and Spark environment..."
+/opt/airflow/fix_bash_issue.sh || true
+
 # Handle different startup commands
 if [[ "$1" == "webserver" ]]; then
   # The database should already be initialized during build, but check and upgrade if needed
@@ -39,6 +43,14 @@ if [[ "$1" == "webserver" ]]; then
       -e admin@example.com || echo "Warning: User creation failed, but continuing..."
   fi
   
+  # Set up Airflow connections
+  echo "Setting up Airflow connections..."
+  airflow connections delete spark_default 2>/dev/null || true
+  airflow connections add 'spark_default' \
+    --conn-type 'spark' \
+    --conn-host 'local[*]' \
+    --conn-extra '{"spark-home": "/home/airflow/.local/", "spark-binary": "/usr/local/bin/spark-submit-wrapper"}' || echo "Warning: Could not create connection, will use environment variable"
+  
   echo "Starting Airflow webserver..."
   exec airflow webserver
   
@@ -48,6 +60,10 @@ elif [[ "$1" == "scheduler" ]]; then
     echo "Database check failed for scheduler, waiting for webserver to initialize it..."
     sleep 10
   fi
+  
+  # Run a quick environment verification before starting scheduler
+  echo "Running environment verification..."
+  /opt/airflow/verify_environment.sh || echo "Some verification checks failed, but continuing..."
   
   echo "Starting Airflow scheduler..."
   exec airflow scheduler
