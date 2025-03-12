@@ -64,17 +64,13 @@ RUN sed -i 's/\r$//' /opt/airflow/verify_environment.sh && \
     chmod +x /opt/airflow/fix_spark_issues.sh && \
     chmod +x /entrypoint.sh
 
-# Create a Spark submit wrapper to ensure proper execution
+# Create proper symlinks for Spark binaries to ensure compatibility with Airflow
 RUN mkdir -p /usr/local/bin && \
-    echo '#!/bin/sh' > /usr/local/bin/spark-submit-wrapper && \
+    echo '#!/bin/bash' > /usr/local/bin/spark-submit-wrapper && \
     echo '# Wrapper script for spark-submit to ensure proper shell usage' >> /usr/local/bin/spark-submit-wrapper && \
-    echo 'SPARK_SUBMIT=$(which spark-submit 2>/dev/null || echo "not-found")' >> /usr/local/bin/spark-submit-wrapper && \
-    echo 'if [ "$SPARK_SUBMIT" = "not-found" ]; then' >> /usr/local/bin/spark-submit-wrapper && \
-    echo '  echo "ERROR: spark-submit not found in PATH"' >> /usr/local/bin/spark-submit-wrapper && \
-    echo '  exit 1' >> /usr/local/bin/spark-submit-wrapper && \
-    echo 'fi' >> /usr/local/bin/spark-submit-wrapper && \
-    echo 'exec $SPARK_SUBMIT "$@"' >> /usr/local/bin/spark-submit-wrapper && \
+    echo 'exec /home/airflow/.local/bin/spark-submit "$@"' >> /usr/local/bin/spark-submit-wrapper && \
     chmod +x /usr/local/bin/spark-submit-wrapper && \
+    # Create standard spark-submit symlinks that Airflow expects
     ln -sf /usr/local/bin/spark-submit-wrapper /usr/local/bin/spark-submit
 
 # Explicitly set directory permissions
@@ -121,8 +117,8 @@ RUN echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> ~/.bashrc && \
     echo "export PYTHONPATH=/opt/airflow:/home/airflow/.local/lib/python3.7/site-packages:\${PYTHONPATH}" >> ~/.bashrc && \
     echo "export PATH=/home/airflow/.local/bin:\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
 
-# Set up Airflow connections during image build
-ENV AIRFLOW_CONN_SPARK_DEFAULT="spark://local[*]?spark-home=/home/airflow/.local/&spark-binary=/usr/local/bin/spark-submit-wrapper"
+# Set up Airflow connections during image build - using supported spark-binary name
+ENV AIRFLOW_CONN_SPARK_DEFAULT="spark://local[*]?spark-home=/home/airflow/.local/&spark-binary=spark-submit"
 
 # Make sure airflow is in the PATH
 ENV PATH="/home/airflow/.local/bin:${PATH}"

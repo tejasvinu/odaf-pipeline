@@ -49,7 +49,7 @@ if [[ "$1" == "webserver" ]]; then
   airflow connections add 'spark_default' \
     --conn-type 'spark' \
     --conn-host 'local[*]' \
-    --conn-extra '{"spark-home": "/home/airflow/.local/", "spark-binary": "/usr/local/bin/spark-submit-wrapper"}' || echo "Warning: Could not create connection, will use environment variable"
+    --conn-extra '{"spark-home": "/home/airflow/.local/", "spark-binary": "spark-submit"}' || echo "Warning: Could not create connection, will use environment variable"
   
   echo "Starting Airflow webserver..."
   exec airflow webserver
