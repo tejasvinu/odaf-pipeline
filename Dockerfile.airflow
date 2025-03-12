@@ -65,7 +65,8 @@ RUN sed -i 's/\r$//' /opt/airflow/verify_environment.sh && \
     chmod +x /entrypoint.sh
 
 # Create proper spark-submit binary for Airflow by writing a wrapper script directly with an allowed name
-RUN mkdir -p /usr/local/bin && \
+RUN rm -f /usr/local/bin/spark-submit-wrapper && \
+    mkdir -p /usr/local/bin && \
     echo '#!/bin/bash' > /usr/local/bin/spark-submit && \
     echo '# Wrapper script for spark-submit to ensure proper shell usage' >> /usr/local/bin/spark-submit && \
     echo 'exec /home/airflow/.local/bin/spark-submit "$@"' >> /usr/local/bin/spark-submit && \
