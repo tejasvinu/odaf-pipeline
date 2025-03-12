@@ -9,7 +9,7 @@ echo "Airflow home: $AIRFLOW_HOME"
 
 # Make sure the correct Python packages are in the PATH
 export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}/opt/airflow:/home/airflow/.local/lib/python3.7/site-packages"
-export PATH="/home/airflow/.local/bin:$PATH"
+export PATH="/usr/local/bin:/home/airflow/.local/bin:$PATH"
 
 # Create necessary folders with proper permissions (if mounted volumes)
 mkdir -p "${AIRFLOW_HOME}/logs" "${AIRFLOW_HOME}/dags" "${AIRFLOW_HOME}/plugins" "${AIRFLOW_HOME}/config"
@@ -19,6 +19,20 @@ chown -R airflow:root "${AIRFLOW_HOME}" || true
 # Verify and fix bash and spark environment
 echo "Verifying and fixing bash and Spark environment..."
 /opt/airflow/fix_bash_issue.sh || true
+
+# Verify spark-submit binary exists and is in the correct path
+echo "Verifying spark-submit binary..."
+if [ ! -f "/usr/local/bin/spark-submit" ]; then
+  echo "Creating spark-submit binary..."
+  echo '#!/bin/bash' > /usr/local/bin/spark-submit
+  echo '# Wrapper script for spark-submit to ensure proper shell usage' >> /usr/local/bin/spark-submit
+  echo 'exec /home/airflow/.local/bin/spark-submit "$@"' >> /usr/local/bin/spark-submit
+  chmod +x /usr/local/bin/spark-submit
+  
+  # Create symbolic links for other allowed spark binary names
+  ln -sf /usr/local/bin/spark-submit /usr/local/bin/spark2-submit
+  ln -sf /usr/local/bin/spark-submit /usr/local/bin/spark3-submit
+fi
 
 # Handle different startup commands
 if [[ "$1" == "webserver" ]]; then
@@ -51,6 +65,10 @@ if [[ "$1" == "webserver" ]]; then
     --conn-host 'local[*]' \
     --conn-extra '{"spark-home": "/home/airflow/.local/", "spark-binary": "spark-submit"}' || echo "Warning: Could not create connection, will use environment variable"
   
+  # Verify the connection was created correctly
+  echo "Verifying Airflow connections..."
+  airflow connections get spark_default --output json || echo "Warning: Could not verify connection"
+  
   echo "Starting Airflow webserver..."
   exec airflow webserver
   
@@ -64,6 +82,11 @@ elif [[ "$1" == "scheduler" ]]; then
   # Run a quick environment verification before starting scheduler
   echo "Running environment verification..."
   /opt/airflow/verify_environment.sh || echo "Some verification checks failed, but continuing..."
+  
+  # Verify spark-submit is properly configured
+  echo "Checking spark-submit configuration..."
+  which spark-submit || echo "spark-submit not found in PATH"
+  ls -la /usr/local/bin/spark* || echo "No spark binaries found in /usr/local/bin/"
   
   echo "Starting Airflow scheduler..."
   exec airflow scheduler

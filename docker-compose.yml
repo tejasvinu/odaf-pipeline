@@ -251,13 +251,15 @@ services:
       - _AIRFLOW_WWW_USER_PASSWORD=airflow
       # Add Java environment variables
       - JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-      - PATH=/home/airflow/.local/bin:/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - PATH=/usr/local/bin:/home/airflow/.local/bin:/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       # Add MinIO environment variables
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=metrics
       - AIRFLOW_HOME=/opt/airflow
+      # Add Spark connection details
+      - AIRFLOW_CONN_SPARK_DEFAULT=spark://local[*]?spark-home=/home/airflow/.local/&spark-binary=spark-submit
     volumes:
       - ./dags:/opt/airflow/dags
       - ./plugins:/opt/airflow/plugins
@@ -309,13 +311,15 @@ services:
       - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
       # Add Java environment variables
       - JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-      - PATH=/home/airflow/.local/bin:/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - PATH=/usr/local/bin:/home/airflow/.local/bin:/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       # Add MinIO environment variables
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=metrics
       - AIRFLOW_HOME=/opt/airflow
+      # Add Spark connection details
+      - AIRFLOW_CONN_SPARK_DEFAULT=spark://local[*]?spark-home=/home/airflow/.local/&spark-binary=spark-submit
     volumes:
       - ./dags:/opt/airflow/dags
       - ./plugins:/opt/airflow/plugins

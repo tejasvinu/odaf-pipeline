@@ -70,7 +70,13 @@ RUN rm -f /usr/local/bin/spark-submit-wrapper && \
     echo '#!/bin/bash' > /usr/local/bin/spark-submit && \
     echo '# Wrapper script for spark-submit to ensure proper shell usage' >> /usr/local/bin/spark-submit && \
     echo 'exec /home/airflow/.local/bin/spark-submit "$@"' >> /usr/local/bin/spark-submit && \
-    chmod +x /usr/local/bin/spark-submit
+    chmod +x /usr/local/bin/spark-submit && \
+    # Create symbolic links for other allowed spark binary names
+    ln -sf /usr/local/bin/spark-submit /usr/local/bin/spark2-submit && \
+    ln -sf /usr/local/bin/spark-submit /usr/local/bin/spark3-submit && \
+    # Make sure the spark-submit is in PATH and discoverable
+    echo 'export PATH=/usr/local/bin:$PATH' >> /etc/profile && \
+    echo 'export PATH=/usr/local/bin:$PATH' >> /home/airflow/.bashrc
 
 # Explicitly set directory permissions
 RUN mkdir -p /opt/airflow/{logs,dags,plugins,config,downloads} && \
@@ -81,7 +87,7 @@ USER airflow
 
 # Set environment variables to help Python find modules
 ENV PYTHONPATH=/opt/airflow:/home/airflow/.local/lib/python3.7/site-packages:${PYTHONPATH}
-ENV PATH=/home/airflow/.local/bin:${PATH}
+ENV PATH=/home/airflow/.local/bin:/usr/local/bin:${PATH}
 
 # Ensure proper Airflow installation during build time with constraints
 RUN pip install --upgrade pip && \
@@ -114,13 +120,13 @@ RUN pip install --no-cache-dir --user \
 # Add Java and Airflow paths for airflow user's shell
 RUN echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> ~/.bashrc && \
     echo "export PYTHONPATH=/opt/airflow:/home/airflow/.local/lib/python3.7/site-packages:\${PYTHONPATH}" >> ~/.bashrc && \
-    echo "export PATH=/home/airflow/.local/bin:\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
+    echo "export PATH=/usr/local/bin:/home/airflow/.local/bin:\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
 
 # Set up Airflow connections during image build - using supported spark-binary name
 ENV AIRFLOW_CONN_SPARK_DEFAULT="spark://local[*]?spark-home=/home/airflow/.local/&spark-binary=spark-submit"
 
 # Make sure airflow is in the PATH
-ENV PATH="/home/airflow/.local/bin:${PATH}"
+ENV PATH="/usr/local/bin:/home/airflow/.local/bin:${PATH}"
 
 # Set workdir to airflow home
 WORKDIR /opt/airflow
