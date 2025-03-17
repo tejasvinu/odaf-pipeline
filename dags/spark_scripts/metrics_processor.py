@@ -159,7 +159,6 @@ def process_metrics_stream(spark, topic, table_name):
                     .option("startingOffsets", "earliest")
                     .option("failOnDataLoss", "false")
                     .load())
-
         # Parse JSON with node information
         metric_schema = get_metric_schema()
         parsed_df = (stream_df
@@ -199,9 +198,12 @@ def main():
     spark = create_spark_session()
     print(f"Spark version: {spark.version}")
     
-    # Check if running in initialization mode
-    if len(sys.argv) > 1 and sys.argv[1] == '--init-only':
+    # Check if running in initialization mode - check for both --init-schema and --init-only for compatibility
+    if len(sys.argv) > 1 and (sys.argv[1] == '--init-only' or sys.argv[1] == '--init-schema'):
+        print("Running in schema initialization mode only...")
         success = setup_cassandra_schema(spark) and setup_minio(spark)
+        print(f"Schema initialization {'completed successfully' if success else 'failed'}")
+        spark.stop()
         sys.exit(0 if success else 1)
     
     # Ensure schemas exist
