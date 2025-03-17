@@ -27,54 +27,6 @@ dag = DAG(
     tags=['metrics', 'spark', 'kafka', 'cassandra'],
 )
 
-# Function to verify environment
-def verify_environment_func():
-    """Verify the environment setup for Spark, Java, and other dependencies."""
-    results = {}
-    
-    # Check Java
-    try:
-        java_version = subprocess.check_output(['java', '-version'], stderr=subprocess.STDOUT).decode('utf-8')
-        results['java'] = {'status': 'success', 'version': java_version}
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        results['java'] = {'status': 'error', 'message': 'Java not found or error running java -version'}
-    
-    # Check Spark
-    try:
-        spark_version = subprocess.check_output(['spark-submit', '--version'], stderr=subprocess.STDOUT).decode('utf-8')
-        results['spark'] = {'status': 'success', 'version': spark_version}
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        results['spark'] = {'status': 'error', 'message': 'spark-submit not found or error running spark-submit --version'}
-    
-    # Check spark binaries
-    try:
-        spark_binaries = subprocess.check_output(['ls', '-la', '/usr/local/bin/spark*']).decode('utf-8')
-        results['spark_binaries'] = {'status': 'success', 'files': spark_binaries}
-    except subprocess.CalledProcessError:
-        results['spark_binaries'] = {'status': 'error', 'message': 'No spark binaries found in /usr/local/bin/'}
-    
-    # Check environment variables
-    results['env'] = {
-        'JAVA_HOME': os.environ.get('JAVA_HOME', 'Not set'),
-        'PATH': os.environ.get('PATH', 'Not set')
-    }
-    
-    # Print results as JSON for easy parsing
-    print(json.dumps(results, indent=2))
-    
-    # Check if critical components are working
-    if results['java']['status'] == 'error' or results['spark']['status'] == 'error':
-        raise Exception("Critical components (Java or Spark) are not properly configured")
-    
-    return results
-
-# Replace the BashOperator with a PythonOperator for more reliable verification
-verify_env = PythonOperator(
-    task_id='verify_environment',
-    python_callable=verify_environment_func,
-    dag=dag
-)
-
 # Set up Java environment with improved error handling
 setup_java = BashOperator(
     task_id='setup_java',
@@ -228,5 +180,5 @@ monitor_pipeline = BashOperator(
 )
 
 # Define task dependencies
-setup_java >> verify_env >> [check_kafka, check_cassandra, check_prometheus] >> create_kafka_topics >> init_schema
+setup_java >> [check_kafka, check_cassandra, check_prometheus] >> create_kafka_topics >> init_schema
 init_schema >> start_prometheus_kafka >> process_metrics >> monitor_pipeline
