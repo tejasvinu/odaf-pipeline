@@ -64,19 +64,30 @@ RUN sed -i 's/\r$//' /opt/airflow/verify_environment.sh && \
     chmod +x /opt/airflow/fix_spark_issues.sh && \
     chmod +x /entrypoint.sh
 
-# Create proper spark-submit binary for Airflow by writing a wrapper script directly with an allowed name
-RUN rm -f /usr/local/bin/spark-submit-wrapper && \
-    mkdir -p /usr/local/bin && \
-    echo '#!/bin/bash' > /usr/local/bin/spark-submit && \
-    echo '# Wrapper script for spark-submit to ensure proper shell usage' >> /usr/local/bin/spark-submit && \
-    echo 'exec /home/airflow/.local/bin/spark-submit "$@"' >> /usr/local/bin/spark-submit && \
-    chmod +x /usr/local/bin/spark-submit && \
-    # Create symbolic links for other allowed spark binary names
-    ln -sf /usr/local/bin/spark-submit /usr/local/bin/spark2-submit && \
-    ln -sf /usr/local/bin/spark-submit /usr/local/bin/spark3-submit && \
-    # Make sure the spark-submit is in PATH and discoverable
-    echo 'export PATH=/usr/local/bin:$PATH' >> /etc/profile && \
-    echo 'export PATH=/usr/local/bin:$PATH' >> /home/airflow/.bashrc
+# Set up spark-submit and other spark binaries correctly
+# This is updated to ensure compatibility with newer Airflow versions
+RUN mkdir -p /usr/local/bin && \
+    # Create a script that properly sets up spark-submit at container startup
+    echo '#!/bin/bash' > /usr/local/bin/setup-spark-submit && \
+    echo 'set -e' >> /usr/local/bin/setup-spark-submit && \
+    echo 'mkdir -p /home/airflow/.local/bin' >> /usr/local/bin/setup-spark-submit && \
+    echo 'PYSPARK_DIR=$(python -c "import pyspark; print(pyspark.__path__[0])" 2>/dev/null)' >> /usr/local/bin/setup-spark-submit && \
+    echo 'if [ -f "$PYSPARK_DIR/bin/spark-submit" ]; then' >> /usr/local/bin/setup-spark-submit && \
+    echo '  ln -sf "$PYSPARK_DIR/bin/spark-submit" /home/airflow/.local/bin/spark-submit' >> /usr/local/bin/setup-spark-submit && \
+    echo 'else' >> /usr/local/bin/setup-spark-submit && \
+    echo '  echo "#!/bin/bash" > /home/airflow/.local/bin/spark-submit' >> /usr/local/bin/setup-spark-submit && \
+    echo '  echo "python -m pyspark.bin.spark-submit \"\$@\"" >> /home/airflow/.local/bin/spark-submit' >> /usr/local/bin/setup-spark-submit && \
+    echo '  chmod +x /home/airflow/.local/bin/spark-submit' >> /usr/local/bin/setup-spark-submit && \
+    echo 'fi' >> /usr/local/bin/setup-spark-submit && \
+    echo 'chmod +x /home/airflow/.local/bin/spark-submit' >> /usr/local/bin/setup-spark-submit && \
+    echo 'echo "#!/bin/bash" > /usr/local/bin/spark-submit' >> /usr/local/bin/setup-spark-submit && \
+    echo 'echo "exec /home/airflow/.local/bin/spark-submit \"\$@\"" >> /usr/local/bin/spark-submit' >> /usr/local/bin/setup-spark-submit && \
+    echo 'chmod +x /usr/local/bin/spark-submit' >> /usr/local/bin/setup-spark-submit && \
+    echo 'ln -sf /usr/local/bin/spark-submit /usr/local/bin/spark2-submit' >> /usr/local/bin/setup-spark-submit && \
+    echo 'ln -sf /usr/local/bin/spark-submit /usr/local/bin/spark3-submit' >> /usr/local/bin/setup-spark-submit && \
+    chmod +x /usr/local/bin/setup-spark-submit && \
+    # Run the setup script during build time
+    /usr/local/bin/setup-spark-submit
 
 # Explicitly set directory permissions
 RUN mkdir -p /opt/airflow/{logs,dags,plugins,config,downloads} && \
@@ -120,10 +131,12 @@ RUN pip install --no-cache-dir --user \
 # Add Java and Airflow paths for airflow user's shell
 RUN echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> ~/.bashrc && \
     echo "export PYTHONPATH=/opt/airflow:/home/airflow/.local/lib/python3.7/site-packages:\${PYTHONPATH}" >> ~/.bashrc && \
-    echo "export PATH=/usr/local/bin:/home/airflow/.local/bin:\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
+    echo "export PATH=/usr/local/bin:/home/airflow/.local/bin:\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc && \
+    # Run the spark setup script again as airflow user to ensure proper permissions
+    /usr/local/bin/setup-spark-submit
 
-# Set up Airflow connections during image build - using supported spark-binary name
-ENV AIRFLOW_CONN_SPARK_DEFAULT="spark://local[*]?spark-home=/home/airflow/.local/&spark-binary=spark-submit"
+# Set up Airflow connections - use newer format without deprecated spark-home
+ENV AIRFLOW_CONN_SPARK_DEFAULT="spark://local[*]?spark-binary=spark-submit"
 
 # Make sure airflow is in the PATH
 ENV PATH="/usr/local/bin:/home/airflow/.local/bin:${PATH}"
