@@ -101,20 +101,16 @@ USER root
 
 # Now that PySpark is installed, set up spark-submit correctly
 RUN mkdir -p /usr/local/bin /home/airflow/.local/bin && \
-    # Create a simple wrapper that uses pyspark's launcher
-    echo '#!/bin/bash' > /home/airflow/.local/bin/spark-submit && \
-    echo 'exec python -m pyspark.bin.spark-submit "$@"' >> /home/airflow/.local/bin/spark-submit && \
-    chmod +x /home/airflow/.local/bin/spark-submit && \
-    # Create the main spark-submit wrapper
+    # Create the main spark-submit wrapper that directly uses pyspark
     echo '#!/bin/bash' > /usr/local/bin/spark-submit && \
-    echo 'exec /home/airflow/.local/bin/spark-submit "$@"' >> /usr/local/bin/spark-submit && \
+    echo 'exec python -m pyspark.bin.spark-submit "$@"' >> /usr/local/bin/spark-submit && \
     chmod +x /usr/local/bin/spark-submit && \
     # Create symlinks for other allowed spark binary names
     ln -sf /usr/local/bin/spark-submit /usr/local/bin/spark2-submit && \
     ln -sf /usr/local/bin/spark-submit /usr/local/bin/spark3-submit && \
     # Set proper ownership
-    chown -R airflow:root /home/airflow/.local/bin && \
-    chmod -R 755 /home/airflow/.local/bin
+    chown -R airflow:root /usr/local/bin/spark* && \
+    chmod 755 /usr/local/bin/spark*
 
 USER airflow
 

@@ -1,0 +1,4 @@
+plugins/*
+volumes/*
+dags/__pycache__/*
+*.pyc
