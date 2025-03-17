@@ -103,6 +103,7 @@ init_schema = SparkSubmitOperator(
     application_args=['--init-schema'],
     name='init-schema',
     verbose=True,
+    spark_binary="spark-submit",  # Add this line to specify which spark binary to use
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
         'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/bin:/usr/bin:/usr/local/bin:${PATH}',
@@ -121,6 +122,7 @@ start_prometheus_kafka = SparkSubmitOperator(
         'spark.master': 'local[*]'
     },
     name='prometheus-kafka',
+    spark_binary="spark-submit",  # Add this line to specify which spark binary to use
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
         'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/bin:/usr/bin:/usr/local/bin:${PATH}',
@@ -145,6 +147,7 @@ process_metrics = SparkSubmitOperator(
         'spark.cassandra.connection.port': '9042',
         'spark.master': 'local[*]'
     },
+    spark_binary="spark-submit",  # Add this line to specify which spark binary to use
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
         'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/bin:/usr/bin:/usr/local/bin:${PATH}',
