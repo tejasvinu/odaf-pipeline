@@ -258,8 +258,8 @@ services:
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=metrics
       - AIRFLOW_HOME=/opt/airflow
-      # Add Spark connection details
-      - AIRFLOW_CONN_SPARK_DEFAULT=spark://local[*]?spark-home=/home/airflow/.local/&spark-binary=spark-submit
+      # Add Spark connection details with fixed format (removed deprecated spark-home)
+      - AIRFLOW_CONN_SPARK_DEFAULT=spark://local[*]?spark-binary=spark-submit
     volumes:
       - ./dags:/opt/airflow/dags
       - ./plugins:/opt/airflow/plugins
@@ -318,8 +318,8 @@ services:
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=metrics
       - AIRFLOW_HOME=/opt/airflow
-      # Add Spark connection details
-      - AIRFLOW_CONN_SPARK_DEFAULT=spark://local[*]?spark-home=/home/airflow/.local/&spark-binary=spark-submit
+      # Add Spark connection details with fixed format (removed deprecated spark-home)
+      - AIRFLOW_CONN_SPARK_DEFAULT=spark://local[*]?spark-binary=spark-submit
     volumes:
       - ./dags:/opt/airflow/dags
       - ./plugins:/opt/airflow/plugins

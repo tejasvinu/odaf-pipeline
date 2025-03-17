@@ -23,7 +23,7 @@ airflow connections delete spark_default 2>/dev/null || true
 airflow connections add 'spark_default' \
   --conn-type 'spark' \
   --conn-host 'local[*]' \
-  --conn-extra '{"spark-home": "/home/airflow/.local/", "spark-binary": "spark-submit"}'
+  --conn-extra '{"spark-binary": "spark-submit"}'
 
 # Verify connection was created
 echo "Verifying connection was created..."
@@ -34,7 +34,7 @@ else
   echo "Trying alternative connection creation method..."
   
   # Create connection using environment variable with correct spark-binary
-  export AIRFLOW_CONN_SPARK_DEFAULT="spark://local[*]?spark-home=/home/airflow/.local/&spark-binary=spark-submit"
+  export AIRFLOW_CONN_SPARK_DEFAULT="spark://local[*]?spark-binary=spark-submit"
   echo "Set AIRFLOW_CONN_SPARK_DEFAULT environment variable as fallback"
   
   # Add to container's environment files for persistence
