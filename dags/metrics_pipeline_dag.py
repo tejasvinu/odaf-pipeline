@@ -177,13 +177,41 @@ monitor_pipeline = BashOperator(
     dag=dag,
 )
 
+# Modified to check if the script exists and run inline verification if not
 verify_env = BashOperator(
     task_id='verify_environment',
-    bash_command='/opt/airflow/verify_environment.sh',
+    bash_command='''
+    if [ -f /opt/airflow/verify_environment.sh ]; then
+        echo "Running verify_environment.sh script..."
+        chmod +x /opt/airflow/verify_environment.sh
+        /opt/airflow/verify_environment.sh
+    else
+        echo "WARNING: verify_environment.sh script not found, running inline verification..."
+        
+        # Verify Java installation
+        echo "Checking Java..."
+        java -version || echo "Java not found!"
+        
+        # Verify Spark
+        echo "Checking Spark..."
+        spark-submit --version || echo "spark-submit not found!"
+        
+        # Check PATH
+        echo "PATH: $PATH"
+        
+        # Check if spark binaries exist
+        echo "Checking for spark binaries..."
+        ls -la /usr/local/bin/spark* || echo "No spark binaries found in /usr/local/bin/"
+        
+        # Check Airflow connections
+        echo "Checking Airflow connections..."
+        airflow connections get spark_default --output json || echo "spark_default connection not found!"
+    fi
+    ''',
     env={'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64', 'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/bin:/usr/bin:/usr/local/bin:${PATH}'},
     dag=dag
 )
 
 # Define task dependencies
-setup_java >> [check_kafka, check_cassandra, check_prometheus] >> create_kafka_topics >> init_schema
+setup_java >> verify_env >> [check_kafka, check_cassandra, check_prometheus] >> create_kafka_topics >> init_schema
 init_schema >> start_prometheus_kafka >> process_metrics >> monitor_pipeline
