@@ -88,35 +88,24 @@ create_kafka_topics = BashOperator(
     dag=dag,
 )
 
-# Initialize Cassandra schema with node tracking
-init_schema = SparkSubmitOperator(
+# Initialize Cassandra schema with direct connection (not using Spark)
+init_schema = BashOperator(
     task_id='init_schema',
-    conn_id='spark_default',
-    application=os.path.join('/', 'opt', 'airflow', 'dags', 'spark_scripts', 'metrics_processor.py'),
-    conf={
-        'spark.driver.memory': '1g',
-        'spark.executor.memory': '1g',
-        'spark.cassandra.connection.host': 'cassandra',
-        'spark.cassandra.connection.port': '9042',
-        'spark.cassandra.connection.keep_alive_ms': '60000',
-        'spark.cassandra.connection.timeout_ms': '30000',
-        'spark.cassandra.read.timeout_ms': '30000',
-        'spark.master': 'local[*]',
-        'spark.yarn.appMasterEnv.JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
-        'spark.yarn.appMasterEnv.PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:${PATH}',
-        'spark.driver.extraJavaOptions': '-Dcom.datastax.driver.FORCE_NIO=true'
-    },
-    application_args=['--init-schema'],
-    name='init-schema',
-    verbose=True,
-    spark_binary="spark-submit",
-    env_vars={
-        'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
-        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:${PATH}',
+    bash_command='''
+    # Install required packages if they don't exist
+    pip3 install --quiet cassandra-driver boto3 retrying
+
+    echo "Running schema initialization script..."
+    python3 /opt/airflow/dags/spark_scripts/init_schema.py
+    ''',
+    env={
+        'CASSANDRA_HOST': 'cassandra',
+        'CASSANDRA_PORT': '9042',
         'MINIO_ENDPOINT': 'http://minio:9000',
         'MINIO_ACCESS_KEY': 'minioadmin',
         'MINIO_SECRET_KEY': 'minioadmin',
-        'MINIO_BUCKET': 'metrics'
+        'MINIO_BUCKET': 'metrics',
+        'PYTHONUNBUFFERED': '1'  # This ensures Python output is sent immediately to Airflow logs
     },
     dag=dag,
 )
