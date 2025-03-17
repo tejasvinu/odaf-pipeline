@@ -5,6 +5,8 @@ from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOpe
 from airflow.operators.python import PythonOperator
 from airflow.models import Variable
 import os
+import subprocess
+import json
 
 default_args = {
     'owner': 'airflow',
@@ -23,6 +25,54 @@ dag = DAG(
     start_date=datetime(2023, 1, 1),
     catchup=False,
     tags=['metrics', 'spark', 'kafka', 'cassandra'],
+)
+
+# Function to verify environment
+def verify_environment_func():
+    """Verify the environment setup for Spark, Java, and other dependencies."""
+    results = {}
+    
+    # Check Java
+    try:
+        java_version = subprocess.check_output(['java', '-version'], stderr=subprocess.STDOUT).decode('utf-8')
+        results['java'] = {'status': 'success', 'version': java_version}
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        results['java'] = {'status': 'error', 'message': 'Java not found or error running java -version'}
+    
+    # Check Spark
+    try:
+        spark_version = subprocess.check_output(['spark-submit', '--version'], stderr=subprocess.STDOUT).decode('utf-8')
+        results['spark'] = {'status': 'success', 'version': spark_version}
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        results['spark'] = {'status': 'error', 'message': 'spark-submit not found or error running spark-submit --version'}
+    
+    # Check spark binaries
+    try:
+        spark_binaries = subprocess.check_output(['ls', '-la', '/usr/local/bin/spark*']).decode('utf-8')
+        results['spark_binaries'] = {'status': 'success', 'files': spark_binaries}
+    except subprocess.CalledProcessError:
+        results['spark_binaries'] = {'status': 'error', 'message': 'No spark binaries found in /usr/local/bin/'}
+    
+    # Check environment variables
+    results['env'] = {
+        'JAVA_HOME': os.environ.get('JAVA_HOME', 'Not set'),
+        'PATH': os.environ.get('PATH', 'Not set')
+    }
+    
+    # Print results as JSON for easy parsing
+    print(json.dumps(results, indent=2))
+    
+    # Check if critical components are working
+    if results['java']['status'] == 'error' or results['spark']['status'] == 'error':
+        raise Exception("Critical components (Java or Spark) are not properly configured")
+    
+    return results
+
+# Replace the BashOperator with a PythonOperator for more reliable verification
+verify_env = PythonOperator(
+    task_id='verify_environment',
+    python_callable=verify_environment_func,
+    dag=dag
 )
 
 # Set up Java environment with improved error handling
@@ -175,41 +225,6 @@ monitor_pipeline = BashOperator(
     echo "Pipeline monitoring completed"
     ''',
     dag=dag,
-)
-
-# Modified to check if the script exists and run inline verification if not
-verify_env = BashOperator(
-    task_id='verify_environment',
-    bash_command='''
-    if [ -f /opt/airflow/verify_environment.sh ]; then
-        echo "Running verify_environment.sh script..."
-        chmod +x /opt/airflow/verify_environment.sh
-        /opt/airflow/verify_environment.sh
-    else
-        echo "WARNING: verify_environment.sh script not found, running inline verification..."
-        
-        # Verify Java installation
-        echo "Checking Java..."
-        java -version || echo "Java not found!"
-        
-        # Verify Spark
-        echo "Checking Spark..."
-        spark-submit --version || echo "spark-submit not found!"
-        
-        # Check PATH
-        echo "PATH: $PATH"
-        
-        # Check if spark binaries exist
-        echo "Checking for spark binaries..."
-        ls -la /usr/local/bin/spark* || echo "No spark binaries found in /usr/local/bin/"
-        
-        # Check Airflow connections
-        echo "Checking Airflow connections..."
-        airflow connections get spark_default --output json || echo "spark_default connection not found!"
-    fi
-    ''',
-    env={'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64', 'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/bin:/usr/bin:/usr/local/bin:${PATH}'},
-    dag=dag
 )
 
 # Define task dependencies
