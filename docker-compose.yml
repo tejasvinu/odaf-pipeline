@@ -266,6 +266,7 @@ services:
       - ./volumes/airflow_logs:/opt/airflow/logs
       - ./volumes/airflow_config:/opt/airflow/config
       - ./verify_environment.sh:/opt/airflow/verify_environment.sh  # Add direct mount for verification script
+      - /var/run/docker.sock:/var/run/docker.sock  # Add Docker socket mount
     user: "root"  # Run as root to avoid permission issues
     ports:
       - "8081:8080"
@@ -326,6 +327,7 @@ services:
       - ./volumes/airflow_logs:/opt/airflow/logs
       - ./volumes/airflow_config:/opt/airflow/config
       - ./verify_environment.sh:/opt/airflow/verify_environment.sh  # Add direct mount for verification script
+      - /var/run/docker.sock:/var/run/docker.sock  # Add Docker socket mount
     user: "root"  # Run as root to avoid permission issues
     # Using the entrypoint script with "scheduler" command
     command: ["scheduler"]
@@ -380,4 +382,3 @@ networks:
   monitoring-network:
   airflow-network:
     driver: bridge
-

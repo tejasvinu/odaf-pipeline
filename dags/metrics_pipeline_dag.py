@@ -76,43 +76,9 @@ check_prometheus = BashOperator(
 create_kafka_topics = BashOperator(
     task_id='create_kafka_topics',
     bash_command='''
-    # Find Kafka installation
-    if [ -d "/opt/kafka/bin" ]; then
-        KAFKA_HOME="/opt/kafka"
-    elif [ -d "/usr/local/kafka/bin" ]; then
-        KAFKA_HOME="/usr/local/kafka"
-    elif [ -d "/opt/bitnami/kafka/bin" ]; then
-        KAFKA_HOME="/opt/bitnami/kafka"
-    else
-        # Search for kafka-topics.sh in common locations
-        KAFKA_TOPICS_PATH=$(find /opt /usr/local /usr -name "kafka-topics.sh" 2>/dev/null | head -1)
-        if [ -n "$KAFKA_TOPICS_PATH" ]; then
-            KAFKA_HOME=$(dirname $(dirname $KAFKA_TOPICS_PATH))
-            echo "Found Kafka installation at $KAFKA_HOME"
-        else
-            echo "Error: Unable to locate kafka-topics.sh. Please install Kafka or specify the correct path."
-            echo "Searching for any kafka related binaries:"
-            find /opt /usr/local /usr -name "kafka*" 2>/dev/null || echo "No Kafka binaries found"
-            exit 1
-        fi
-    fi
-    
-    export PATH=$KAFKA_HOME/bin:$PATH
-    echo "Using Kafka from: $KAFKA_HOME"
-    echo "Updated PATH: $PATH"
-    
-    # Verify kafka-topics.sh is in PATH
-    if command -v kafka-topics.sh >/dev/null 2>&1; then
-        echo "kafka-topics.sh found at $(which kafka-topics.sh)"
-    else
-        echo "Error: kafka-topics.sh not found in PATH even after setting KAFKA_HOME"
-        exit 1
-    fi
-    
-    # Create topics
     for topic in node-metrics node-resource-usage node-health-status; do
-        $KAFKA_HOME/bin/kafka-topics.sh --create --if-not-exists \
-            --bootstrap-server kafka:29092 \
+        docker exec kafka /opt/bitnami/kafka/bin/kafka-topics.sh --create --if-not-exists \
+            --bootstrap-server localhost:9092 \
             --replication-factor 1 \
             --partitions 3 \
             --config retention.ms=86400000 \
@@ -198,33 +164,9 @@ process_metrics = SparkSubmitOperator(
 monitor_pipeline = BashOperator(
     task_id='monitor_pipeline',
     bash_command='''
-    # Find Kafka installation
-    if [ -d "/opt/kafka/bin" ]; then
-        KAFKA_HOME="/opt/kafka"
-    elif [ -d "/usr/local/kafka/bin" ]; then
-        KAFKA_HOME="/usr/local/kafka"
-    elif [ -d "/opt/bitnami/kafka/bin" ]; then
-        KAFKA_HOME="/opt/bitnami/kafka"
-    else
-        # Search for kafka-topics.sh in common locations
-        KAFKA_TOPICS_PATH=$(find /opt /usr/local /usr -name "kafka-topics.sh" 2>/dev/null | head -1)
-        if [ -n "$KAFKA_TOPICS_PATH" ]; then
-            KAFKA_HOME=$(dirname $(dirname $KAFKA_TOPICS_PATH))
-            echo "Found Kafka installation at $KAFKA_HOME"
-        else
-            echo "Error: Unable to locate kafka-topics.sh. Please install Kafka or specify the correct path."
-            echo "Searching for any kafka related binaries:"
-            find /opt /usr/local /usr -name "kafka*" 2>/dev/null || echo "No Kafka binaries found"
-            exit 1
-        fi
-    fi
-    
-    export PATH=$KAFKA_HOME/bin:$PATH
-    
-    # Check Kafka topics and partitions
     echo "Checking Kafka topics and partitions..."
-    $KAFKA_HOME/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list | grep "node-" && \
-    $KAFKA_HOME/bin/kafka-topics.sh --bootstrap-server kafka:29092 --describe | grep "node-" && \
+    docker exec kafka /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list | grep "node-" && \
+    docker exec kafka /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe | grep "node-" && \
     
     # Check Cassandra keyspaces and tables
     echo "Checking Cassandra schema..."
