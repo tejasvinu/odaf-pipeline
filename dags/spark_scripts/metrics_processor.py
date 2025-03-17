@@ -30,11 +30,18 @@ def create_spark_session():
 def setup_cassandra_schema(spark):
     """Create keyspace and tables in Cassandra for node-aware metrics."""
     try:
-        # Create keyspace
+        # Test Cassandra connection first
+        print("Testing Cassandra connection...")
+        spark.sql("SELECT now() FROM system.local").show()
+        print("Successfully connected to Cassandra")
+        
+        # Create keyspace with explicit IF NOT EXISTS
+        print("Creating keyspace...")
         spark.sql("""
             CREATE KEYSPACE IF NOT EXISTS metrics
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
         """)
+        print("Keyspace creation successful")
         
         # Create tables with node identification
         tables = {
@@ -77,12 +84,18 @@ def setup_cassandra_schema(spark):
         }
         
         for table_name, create_stmt in tables.items():
+            print(f"Creating table {table_name}...")
             spark.sql(create_stmt)
+            # Verify table was created
+            spark.sql(f"SELECT COUNT(*) FROM metrics.{table_name} LIMIT 1").show()
+            print(f"Successfully created/verified table {table_name}")
             
-        print("Successfully created Cassandra schema with node tracking")
+        print("Successfully created all Cassandra schemas with node tracking")
         return True
     except Exception as e:
-        print(f"Error creating Cassandra schema: {e}")
+        print(f"Error creating Cassandra schema: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def setup_minio(spark):

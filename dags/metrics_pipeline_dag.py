@@ -98,17 +98,25 @@ init_schema = SparkSubmitOperator(
         'spark.executor.memory': '1g',
         'spark.cassandra.connection.host': 'cassandra',
         'spark.cassandra.connection.port': '9042',
+        'spark.cassandra.connection.keep_alive_ms': '60000',
+        'spark.cassandra.connection.timeout_ms': '30000',
+        'spark.cassandra.read.timeout_ms': '30000',
         'spark.master': 'local[*]',
         'spark.yarn.appMasterEnv.JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
-        'spark.yarn.appMasterEnv.PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:${PATH}'
+        'spark.yarn.appMasterEnv.PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:${PATH}',
+        'spark.driver.extraJavaOptions': '-Dcom.datastax.driver.FORCE_NIO=true'
     },
     application_args=['--init-schema'],
     name='init-schema',
     verbose=True,
-    spark_binary="spark-submit",  # Add this line to specify which spark binary to use
+    spark_binary="spark-submit",
     env_vars={
         'JAVA_HOME': '/usr/lib/jvm/java-11-openjdk-amd64',
-        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/bin:/usr/bin:/usr/local/bin:${PATH}',
+        'PATH': '/usr/lib/jvm/java-11-openjdk-amd64/bin:/usr/local/bin:${PATH}',
+        'MINIO_ENDPOINT': 'http://minio:9000',
+        'MINIO_ACCESS_KEY': 'minioadmin',
+        'MINIO_SECRET_KEY': 'minioadmin',
+        'MINIO_BUCKET': 'metrics'
     },
     dag=dag,
 )
